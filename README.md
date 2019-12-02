@@ -17,21 +17,56 @@ shell:>
 
 ## Jasypt Commands
 
-Prerequisite: set the jasypt encryptor password via the `set-password` command.
+Prerequisite: set the jasypt encryptor password via the `jasypt-set-password` command.
 
 ```
-shell:>set-password a1I2NlqvgGu6UiS49UcLbxX3r0j5RawJ0HF8hPSwN7RhYS3dfHQByzi51LXxRy2I
+shell:> jasypt-set-password a1I2NlqvgGu6UiS49UcLbxX3r0j5RawJ0HF8hPSwN7RhYS3dfHQByzi51LXxRy2I
 ```
 
 Then use
-- either the `encrypt` command to encode you plain text
-- or the `decrypt` command to decode/verify the encoded text (which is produced by `encrypt`)
+- either the `jasypt-encrypt` command to encode you plain text
+- or the `jasypt-decrypt` command to decode/verify the encoded text (which is produced by `encrypt`)
 
 ```
-shell:>encrypt hello
+shell:> jasypt-encrypt hello
 NDhN0LG4iwSrCXNGEzKNXw==
-shell:>decrypt NDhN0LG4iwSrCXNGEzKNXw==
+shell:> jasypt-decrypt NDhN0LG4iwSrCXNGEzKNXw==
 hello
+```
+
+## Aliyun Oss Commands
+
+### Verify OSS STS 
+
+Verify you OSS STS settings, outputs either a success or failure.
+
+Arguments
+- `region` mandatory e.g., cn-hangzhou
+- `access-key-id` mandatory
+- `access-key-access` mandatory
+- `arn` mandatory
+
+For how to setup your STS, see: [STS临时授权访问OSS](https://help.aliyun.com/document_detail/100624.html)
+
+Outputs SUCCESS if works:
+
+```
+shell:> aliyun-oss-verify-sts --region 'cn-hangzhou' --access-key-id your_access_key_id --access-key-secret your_access_key_secret --arn 'your_arn'
+SUCCESS
+	Expiration: 2019-12-02T07:42:33Z
+	Access Key Id: STS.NUposKnuoZrHejWQoRTJxMvmu
+	Access Key Secret: HXoj2jkkUh5RmQvuen1o8XNd5zm4Ym9xofjYyxcg4M9R
+	Security Token: CAISgwJ1q6Ft5B2yfSjIr5bFJMn/g6pO7bCjZ0zmtW8HWMVUorPGlzz2IHhJdXRoB+0YtPk0mm9R6vYflrJtSoNCQkjzc8Zq75pGxlr8PNeb5JXosOFb0MD9krRFz5q+jqHoeOzcYI73WJXEMiLp9EJaxb/9ak/RPTiMOoGIjphKd8keWhLCAxNNGNZRIHkJyqZYTwyzU8ygKRn3mGHdIVN1sw5n8wNF5L+439eX52i17jS46JdM/dysc8H5PpI2Zc8gCIzk5oEsKPqdihw3wgNR6aJ7gJZD/Tr6pdyHCzFTmU7ebruJqoMyclUkPfZlQvIU8eKdkuZjofDIjY3y27Xh2X/fo961GoABsGqEokoc7WHfmSse50pWsAbQUoV4VRsE2Web1MnUR4W3zkcNHeN4elUk3g8wwJ5Fq9YyGVA1mW6b8VIaiNocXtxT/FXvCYIbo1t7FvaAifPpilFSimvE0qmEuXe60PM8+pcDUu+l3ILODAMdl44Qjh7qg6yNsTIQ7nstEi4CRs8=
+	RequestId: C1F3F357-EEFE-4A93-A6EA-9D424870067C
+```
+
+Otherwise a FAILURE, e.g.:
+```
+shell:> aliyun-oss-verify-sts --region 'ch-hangzhou' --access-key-id your_access_key_id --access-key-secret your_access_key_secret --arn 'your_arn'
+FAILURE
+	Error code: SDK.InvalidRegionId
+	Error message: Can not find endpoint to access.
+	RequestId: null
 ```
 
 ## Integration
@@ -103,3 +138,7 @@ If running in IDE, simply add VM options, e.g.,
 ```
 
 If running in tomcat, add this `-D` option in `$TOMCAT_HOME/bin/setenv.sh`
+
+## License
+
+MIT
