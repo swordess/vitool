@@ -5,7 +5,7 @@ CLI tools, independent of business.
 ## Planned Tasks
 
 - add unit tests, coverage rate > 90% is promised at this stage
-- deploy to a public maven repo (JFrog Bintray, maybe), so that it's possible to embed this lib to a larger project
+- deploy to a public maven repo (JCenter Bintray, maybe), so that it's possible to embed this lib to a larger project
 - deploy to the Docker hub, as client side's convenience comes first for a tool
 
 ## Usage
