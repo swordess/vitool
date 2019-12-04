@@ -1,4 +1,4 @@
-package com.swordess.common.vitool;
+package org.swordess.common.vitool;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

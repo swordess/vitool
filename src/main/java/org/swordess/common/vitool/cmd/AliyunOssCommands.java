@@ -1,4 +1,4 @@
-package com.swordess.common.vitool.cmd;
+package org.swordess.common.vitool.cmd;
 
 import com.aliyuncs.DefaultAcsClient;
 import com.aliyuncs.exceptions.ClientException;

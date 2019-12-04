@@ -1,4 +1,4 @@
-package com.swordess.common.vitool.cmd;
+package org.swordess.common.vitool.cmd;
 
 import org.jasypt.encryption.StringEncryptor;
 import org.jasypt.encryption.pbe.PooledPBEStringEncryptor;
