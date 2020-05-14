@@ -12,6 +12,9 @@ CLI tools, independent of business.
 
 ### From Docker
 
+Supported tags:
+- latest, 1.0.0
+
 ```
 docker pull xingyuli/vitool:<tag>
 docker run --rm -it xingyuli/vitool:<tag>
@@ -26,10 +29,10 @@ Clone this project and then
 ```
 cd dir_of_this_project
 mvn clean install
-java -jar target/vitool-1.0.0-SNAPSHOT.jar
+java -jar target/vitool-<version>.jar
 ```
 
-Then you will see the Spring Shell command prompt:
+You will see the Spring Shell command prompt if succeed:
 ```
 shell:>
 ```
