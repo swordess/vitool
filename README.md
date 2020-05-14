@@ -8,7 +8,20 @@ CLI tools, independent of business.
 - deploy to a public maven repo (JCenter Bintray, maybe), so that it's possible to embed this lib to a larger project
 - deploy to the Docker hub, as client side's convenience comes first for a tool
 
-## Usage
+## Installation
+
+### From Docker
+
+```
+docker pull xingyuli/vitool:<tag>
+docker run --rm -it xingyuli/vitool:<tag>
+```
+
+For China, please use `registry.cn-beijing.aliyuncs.com/viclau/vitool:<tag>` instead.
+
+### Build From Source
+
+Clone this project and then
 
 ```
 cd dir_of_this_project

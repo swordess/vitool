@@ -1,44 +1,29 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.2.7.RELEASE</version>
+    </parent>
     <groupId>org.swordess.common</groupId>
     <artifactId>vitool</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-    <packaging>jar</packaging>
-
-    <name>vitool</name>
+    <version>1.0.0</version>
 
     <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <java.version>1.8</java.version>
 
-        <spring.boot.version>2.1.5.RELEASE</spring.boot.version>
-        <springshell.boot.version>2.0.0.RELEASE</springshell.boot.version>
+        <spring-shell.version>2.0.1.RELEASE</spring-shell.version>
+        <jansi.version>1.18</jansi.version>
         <jasypt.version>1.9.4</jasypt.version>
-        <aliyun_sdk_oss.version>3.8.0</aliyun_sdk_oss.version>
+        <aliyun-oss.version>3.9.1</aliyun-oss.version>
     </properties>
-
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-dependencies</artifactId>
-                <version>${spring.boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 
     <dependencies>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.springframework.shell</groupId>
             <artifactId>spring-shell-starter</artifactId>
-            <version>${springshell.boot.version}</version>
+            <version>${spring-shell.version}</version>
         </dependency>
         <dependency>
             <groupId>com.melloware</groupId>
@@ -48,7 +33,7 @@
         <dependency>
             <groupId>com.aliyun.oss</groupId>
             <artifactId>aliyun-sdk-oss</artifactId>
-            <version>${aliyun_sdk_oss.version}</version>
+            <version>${aliyun-oss.version}</version>
         </dependency>
 
         <dependency>
@@ -61,21 +46,21 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
-            </plugin>
-            <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>${spring.boot.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>repackage</goal>
-                        </goals>
-                    </execution>
-                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>2.2.0</version>
+                <configuration>
+                    <from>
+                        <image>docker://adoptopenjdk/openjdk8-openj9:alpine-jre</image>
+                    </from>
+                    <to>
+                        <image>registry.cn-beijing.aliyuncs.com/viclau/vitool:${project.version}</image>
+                    </to>
+                </configuration>
             </plugin>
         </plugins>
     </build>
