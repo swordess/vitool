@@ -6,7 +6,7 @@ CLI tools, independent of business.
 
 - add unit tests, coverage rate > 90% is promised at this stage
 - deploy to a public maven repo (JCenter Bintray, maybe), so that it's possible to embed this lib to a larger project
-- deploy to the Docker hub, as client side's convenience comes first for a tool
+- ~~20200514 deploy to the Docker hub, as client side's convenience comes first for a tool~~
 
 ## Installation
 
