@@ -16,7 +16,7 @@
         <spring-shell.version>2.0.1.RELEASE</spring-shell.version>
         <jansi.version>1.18</jansi.version>
         <jasypt.version>1.9.4</jasypt.version>
-        <aliyun-oss.version>3.9.1</aliyun-oss.version>
+        <aliyun-oss.version>3.11.1</aliyun-oss.version>
     </properties>
 
     <dependencies>
