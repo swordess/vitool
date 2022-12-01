@@ -5,15 +5,26 @@ CLI tools, independent of business.
 ## Planned Tasks
 
 - add unit tests, coverage rate > 90% is promised at this stage
-- deploy to a public maven repo (JCenter Bintray, maybe), so that it's possible to embed this lib to a larger project
-- ~~20200514 deploy to the Docker hub, as client side's convenience comes first for a tool~~
+- ~~deploy to a public maven repo (JCenter Bintray, maybe), so that it's possible to embed this lib to a larger project~~
+  - Updates 2022.12.01: Cancelled, the JCenter Bintray has been shutdown, and there is no embedding case in general.
+- ~~deploy to the Docker hub, as client side's convenience comes first for a tool~~
+  - Updates 2020.05.14: Done
+
+## Changes
+
+### 1.1.0
+
+- New commands for manipulating databases: [Database Commands](#database-commands). Supported databases are:
+  - PostgreSQL
+  - MySQL
 
 ## Installation
 
 ### From Docker
 
 Supported tags:
-- latest, 1.0.0
+- latest, 1.1.0
+- 1.0.0
 
 ```
 docker pull xingyuli/vitool:<tag>
@@ -32,7 +43,7 @@ mvn clean install
 java -jar target/vitool-<version>.jar
 ```
 
-You will see the Spring Shell command prompt if succeed:
+You will see the Spring Shell command prompt if succeeded:
 ```
 shell:>
 ```
@@ -89,6 +100,82 @@ FAILURE
 	Error code: SDK.InvalidRegionId
 	Error message: Can not find endpoint to access.
 	RequestId: null
+```
+
+## [Database Commands](#database-commands)
+
+These commands are designed to be used when:
+- it's hard to get or download a library(, client, ... whatever) to connect to your database
+- or you need to check some data is right there
+- or you want to do some changes to existed data
+
+And not be used when:
+- you want to get precisely the same query output against a certain database's official CLI tool
+
+Things you should be noticed:
+- only one sql statement may be submitted either by `db-query` or `db-command`
+- only one connection will be established, this implies a NO Connection Pool approach
+- there is no keep alive mechanism (statement e.g., `select * from 1`) in the background, so it's possible you see the connection has broken when you submit a sql after a period of time, `db-reconnect` comes to rescue
+- `db-command` is not limited to `update`, `delete`, you may submit `begin`, `commit`, `rollback` as needed.
+
+> **Though it's powerful, you must be carefully enough to work with it. No confirmations will be given.**  
+
+### Connection management
+
+You can pass connection properties either in the shell directly, or via environment variables.
+
+Via shell:
+```
+shell:> db-connect jdbc:mysql://localhost:3306/demo your_username your_password
+Connection has been established.
+```
+
+Via environment variable:
+```
+$ EXPORT VI_DB_URL='jdbc:mysql://localhost:3306/demo'
+$ EXPORT VI_DB_USERNAME=your_username
+$ EXPORT VI_DB_PASSWORD=your_password
+
+# then connect
+shell:> db-connect
+Connection has been established.
+```
+
+Once your work has been done, close the connection with:
+
+```
+shell:> db-close
+Connection has been closed.
+```
+
+In case any edge cases leading to a broken connection, you may re-establish with:
+```
+shell:> db-reconnect
+Connection has been closed.
+Connection has been established.
+```
+
+### Execute a query
+
+You are responsible to guarantee the sql integrity, the whole sql statement should be quoted by either single quotes or double quotes.
+
+```
+shell:> db-query 'select * from t_example limit 1'
+[0] = {
+  "account_id": 1,
+  "log_ts": "Jan 19, 2000 1:00:00 PM",
+  "amount": 6570
+}
+1 row(s) returned
+```
+
+### Execute DML statement
+
+You are responsible to guarantee the sql integrity, the whole sql statement should be quoted by either single quotes or double quotes.
+
+```
+shell:> db-command "insert into t_example (`account_id`, `log_ts`, `amount`) values ('2', '2022-12-01 10:00:00.000', '99')"
+1 row(s) affected
 ```
 
 ## Integration

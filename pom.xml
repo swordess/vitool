@@ -8,7 +8,7 @@
     </parent>
     <groupId>org.swordess.common</groupId>
     <artifactId>vitool</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 
     <properties>
         <java.version>1.8</java.version>
@@ -17,6 +17,14 @@
         <jansi.version>1.18</jansi.version>
         <jasypt.version>1.9.4</jasypt.version>
         <aliyun-oss.version>3.9.1</aliyun-oss.version>
+
+        <!-- this is the last version that compatible with Java 8 -->
+        <jooq.version>3.14.9</jooq.version>
+
+        <postgresql.version>42.5.1</postgresql.version>
+        <mysql-connector.version>8.0.31</mysql-connector.version>
+
+        <gson.version>2.10</gson.version>
     </properties>
 
     <dependencies>
@@ -34,6 +42,29 @@
             <groupId>com.aliyun.oss</groupId>
             <artifactId>aliyun-sdk-oss</artifactId>
             <version>${aliyun-oss.version}</version>
+        </dependency>
+
+        <!-- Database Commands -->
+        <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq</artifactId>
+            <version>${jooq.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>${mysql-connector.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>${gson.version}</version>
         </dependency>
 
         <dependency>

@@ -13,7 +13,7 @@ import org.springframework.shell.standard.ShellMethod;
 @ShellComponent
 public class AliyunOssCommands {
 
-    @ShellMethod("Verify the STS configuration by retrieving the AK")
+    @ShellMethod("Verify the STS configuration by retrieving the AK.")
     public String aliyunOssVerifySts(String region, String accessKeyId, String accessKeySecret, String arn) {
         try {
             IClientProfile profile = DefaultProfile.getProfile(region, accessKeyId, accessKeySecret);
