@@ -1,12 +1,12 @@
 package org.swordess.common.vitool.cmd;
 
 import com.aliyuncs.DefaultAcsClient;
+import com.aliyuncs.auth.sts.AssumeRoleRequest;
+import com.aliyuncs.auth.sts.AssumeRoleResponse;
 import com.aliyuncs.exceptions.ClientException;
 import com.aliyuncs.http.MethodType;
 import com.aliyuncs.profile.DefaultProfile;
 import com.aliyuncs.profile.IClientProfile;
-import com.aliyuncs.sts.model.v20150401.AssumeRoleRequest;
-import com.aliyuncs.sts.model.v20150401.AssumeRoleResponse;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
 
@@ -20,7 +20,7 @@ public class AliyunOssCommands {
             DefaultAcsClient client = new DefaultAcsClient(profile);
 
             AssumeRoleRequest request = new AssumeRoleRequest();
-            request.setMethod(MethodType.POST);
+            request.setSysMethod(MethodType.POST);
             request.setRoleArn(arn);
             request.setRoleSessionName("vitool_verify_" + System.currentTimeMillis());
             request.setDurationSeconds(1000L); // 设置凭证有效时间

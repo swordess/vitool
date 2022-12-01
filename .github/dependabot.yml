@@ -7,15 +7,6 @@ updates:
   open-pull-requests-limit: 10
   ignore:
   - dependency-name: org.springframework.boot:spring-boot-starter-parent
-    versions:
-    - 2.4.2
-    - 2.4.3
-    - 2.4.4
-  - dependency-name: com.google.cloud.tools:jib-maven-plugin
-    versions:
-    - 2.7.1
-    - 2.8.0
-  - dependency-name: com.aliyun.oss:aliyun-sdk-oss
-    versions:
-    - 3.11.2
-    - 3.11.3
+    update-types: ["version-update:semver-major"]
+  - dependency-name: org.jooq:jooq
+    update-types: ["version-update:semver-major", "version-update:semver-minor"]
