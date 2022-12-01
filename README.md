@@ -76,7 +76,7 @@ Verify you OSS STS settings, outputs either a success or failure.
 Arguments
 - `region` mandatory e.g., cn-hangzhou
 - `access-key-id` mandatory
-- `access-key-access` mandatory
+- `access-key-secret` mandatory
 - `arn` mandatory
 
 For how to setup your STS, see: [STS临时授权访问OSS](https://help.aliyun.com/document_detail/100624.html)
