@@ -19,7 +19,7 @@
         <aliyun-oss.version>3.9.1</aliyun-oss.version>
 
         <!-- this is the last version that compatible with Java 8 -->
-        <jooq.version>3.14.9</jooq.version>
+        <jooq.version>3.17.5</jooq.version>
 
         <postgresql.version>42.5.1</postgresql.version>
         <mysql-connector.version>8.0.31</mysql-connector.version>
