@@ -2,7 +2,25 @@
 
 CLI tools, independent of business.
 
-## Planned Tasks
+# Table of Contents
+
+- [Planned Tasks](#planned-tasks)
+- [Features](#features)
+- [Changes](#changes)
+  - [1.1.1](#111)
+  - [1.1.0](#110)
+- [Installation](#installation)
+  - [From Docker](#from-docker)
+  - [Build From Source](#build-from-source)
+- [Commands](#commands)
+  - [Jasypt Commands](#jasypt-commands)
+  - [Aliyun Oss Commands](#aliyun-oss-commands)
+  - [Database Commands](#database-commands)
+- [Integration](#integration)
+  - [Jasypt Spring Boot Integration](#jasypt-spring-boot-integration)
+- [License](#license)
+
+# Planned Tasks
 
 - add unit tests, coverage rate > 90% is promised at this stage
 - ~~deploy to a public maven repo (JCenter Bintray, maybe), so that it's possible to embed this lib to a larger project~~
@@ -10,20 +28,35 @@ CLI tools, independent of business.
 - ~~deploy to the Docker hub, as client side's convenience comes first for a tool~~
   - Updates 2020.05.14: Done
 
-## Changes
+# Features
 
-### 1.1.0
+Feature | Version
+-|-
+[Database Commands](#database-commands) | since 1.1.0
+[Aliyun Oss Commands](#aliyun-oss-commands), [Jasypt Commands](#jasypt-commands) | since 1.0.0
+
+# Changes
+
+## 1.1.1
+
+- Update commands' key, so they look more like a subcommand.
+- Customize the `quit` command, to support automatic resource cleanup.
+- The `password` option of `db connect` now accepts input.
+- Add `format` option to `db query` command, default to `table` .
+
+## 1.1.0
 
 - New commands for manipulating databases: [Database Commands](#database-commands). Supported databases are:
   - PostgreSQL
   - MySQL
 
-## Installation
+# Installation
 
-### From Docker
+## From Docker
 
 Supported tags:
-- latest, 1.1.0
+- latest, 1.1.1
+- 1.1.0
 - 1.0.0
 
 ```
@@ -33,43 +66,45 @@ docker run --rm -it xingyuli/vitool:<tag>
 
 For China, please use `registry.cn-beijing.aliyuncs.com/viclau/vitool:<tag>` instead.
 
-### Build From Source
+## Build From Source
 
 Clone this project and then
 
 ```
 cd dir_of_this_project
-mvn clean install
+mvn clean package
 java -jar target/vitool-<version>.jar
 ```
 
 You will see the Spring Shell command prompt if succeeded:
 ```
-shell:>
+vitool:>
 ```
+
+# Commands
 
 ## Jasypt Commands
 
-Prerequisite: set the jasypt encryptor password via the `jasypt-set-password` command.
+Prerequisite: set the jasypt encryptor password via the `jasypt set-password` command.
 
 ```
-shell:> jasypt-set-password a1I2NlqvgGu6UiS49UcLbxX3r0j5RawJ0HF8hPSwN7RhYS3dfHQByzi51LXxRy2I
+vitool:> jasypt set-password a1I2NlqvgGu6UiS49UcLbxX3r0j5RawJ0HF8hPSwN7RhYS3dfHQByzi51LXxRy2I
 ```
 
 Then use
-- either the `jasypt-encrypt` command to encode you plain text
-- or the `jasypt-decrypt` command to decode/verify the encoded text (which is produced by `encrypt`)
+- either the `jasypt encrypt` command to encode you plain text
+- or the `jasypt decrypt` command to decode/verify the encoded text (which is produced by `encrypt`)
 
 ```
-shell:> jasypt-encrypt hello
+vitool:> jasypt encrypt hello
 NDhN0LG4iwSrCXNGEzKNXw==
-shell:> jasypt-decrypt NDhN0LG4iwSrCXNGEzKNXw==
+vitool:> jasypt decrypt NDhN0LG4iwSrCXNGEzKNXw==
 hello
 ```
 
 ## Aliyun Oss Commands
 
-### Verify OSS STS 
+### Verify OSS STS
 
 Verify you OSS STS settings, outputs either a success or failure.
 
@@ -84,7 +119,7 @@ For how to setup your STS, see: [STS临时授权访问OSS](https://help.aliyun.c
 Outputs SUCCESS if works:
 
 ```
-shell:> aliyun-oss-verify-sts --region 'cn-hangzhou' --access-key-id your_access_key_id --access-key-secret your_access_key_secret --arn 'your_arn'
+vitool:> aliyun-oss-verify-sts --region 'cn-hangzhou' --access-key-id your_access_key_id --access-key-secret your_access_key_secret --arn 'your_arn'
 SUCCESS
 	Expiration: 2019-12-02T07:42:33Z
 	Access Key Id: STS.NUposKnuoZrHejWQoRTJxMvmu
@@ -95,14 +130,14 @@ SUCCESS
 
 Otherwise a FAILURE, e.g.:
 ```
-shell:> aliyun-oss-verify-sts --region 'ch-hangzhou' --access-key-id your_access_key_id --access-key-secret your_access_key_secret --arn 'your_arn'
+vitool:> aliyun-oss-verify-sts --region 'ch-hangzhou' --access-key-id your_access_key_id --access-key-secret your_access_key_secret --arn 'your_arn'
 FAILURE
 	Error code: SDK.InvalidRegionId
 	Error message: Can not find endpoint to access.
 	RequestId: null
 ```
 
-## [Database Commands](#database-commands)
+## Database Commands
 
 These commands are designed to be used when:
 - it's hard to get or download a library(, client, ... whatever) to connect to your database
@@ -113,12 +148,12 @@ And not be used when:
 - you want to get precisely the same query output against a certain database's official CLI tool
 
 Things you should be noticed:
-- only one sql statement may be submitted either by `db-query` or `db-command`
+- only one sql statement may be submitted either by `db query` or `db command`
 - only one connection will be established, this implies a NO Connection Pool approach
-- there is no keep alive mechanism (statement e.g., `select * from 1`) in the background, so it's possible you see the connection has broken when you submit a sql after a period of time, `db-reconnect` comes to rescue
-- `db-command` is not limited to `update`, `delete`, you may submit `begin`, `commit`, `rollback` as needed.
+- there is no keep alive mechanism (statement e.g., `select * from 1`) in the background, so it's possible you see the connection has broken when you submit a sql after a period of time, `db reconnect` comes to rescue
+- `db command` is not limited to `update`, `delete`, you may submit `begin`, `commit`, `rollback` as needed.
 
-> **Though it's powerful, you must be carefully enough to work with it. No confirmations will be given.**  
+> **Though it's powerful, you must be carefully enough to work with it. No confirmations will be given.**
 
 ### Connection management
 
@@ -126,7 +161,14 @@ You can pass connection properties either in the shell directly, or via environm
 
 Via shell:
 ```
-shell:> db-connect jdbc:mysql://localhost:3306/demo your_username your_password
+vitool:> db connect jdbc:mysql://localhost:3306/demo your_username your_password
+Connection has been established.
+```
+
+As all the commands you typed in the interactive shell will be recorded in a log file, for security concern, you can provide the password via input as well:
+```
+vitool:> db connect jdbc:mysql://localhost:3306/demo your_username
+? Enter password: *************
 Connection has been established.
 ```
 
@@ -137,20 +179,22 @@ $ EXPORT VI_DB_USERNAME=your_username
 $ EXPORT VI_DB_PASSWORD=your_password
 
 # then connect
-shell:> db-connect
+vitool:> db connect
 Connection has been established.
 ```
 
 Once your work has been done, close the connection with:
 
 ```
-shell:> db-close
+vitool:> db close
 Connection has been closed.
 ```
 
+> Since `1.1.1`, you can leave the connection closing behind when `quit` (`exit`). It will be automatically called right before the program exit. But for connection property changes, a `db close` is still needed.
+
 In case any edge cases leading to a broken connection, you may re-establish with:
 ```
-shell:> db-reconnect
+vitool:> db reconnect
 Connection has been closed.
 Connection has been established.
 ```
@@ -160,7 +204,7 @@ Connection has been established.
 You are responsible to guarantee the sql integrity, the whole sql statement should be quoted by either single quotes or double quotes.
 
 ```
-shell:> db-query 'select * from t_example limit 1'
+vitool:> db query 'select * from t_example limit 1'
 [0] = {
   "account_id": 1,
   "log_ts": "Jan 19, 2000 1:00:00 PM",
@@ -174,15 +218,15 @@ shell:> db-query 'select * from t_example limit 1'
 You are responsible to guarantee the sql integrity, the whole sql statement should be quoted by either single quotes or double quotes.
 
 ```
-shell:> db-command "insert into t_example (`account_id`, `log_ts`, `amount`) values ('2', '2022-12-01 10:00:00.000', '99')"
+vitool:> db command "insert into t_example (`account_id`, `log_ts`, `amount`) values ('2', '2022-12-01 10:00:00.000', '99')"
 1 row(s) affected
 ```
 
-## Integration
+# Integration
 
-### Jasypt Spring Boot Integration
+## Jasypt Spring Boot Integration
 
-#### Introduce Maven Artifact
+### Introduce Maven Artifact
 
 Add the `jasypt-spring-boot-starter` to your maven dependencies.
 
@@ -200,7 +244,7 @@ Add the `jasypt-spring-boot-starter` to your maven dependencies.
 </dependencies>
 ```
 
-#### Update spring configuration
+### Update spring configuration
 
 Replace the plain text configuration values with encoded values produced by `encrypt` command, in format `ENC(encoded_values)`. e.g.,
 
@@ -225,7 +269,7 @@ spring:
 ```
 
 
-#### Specify the jasypt password
+### Specify the jasypt password
 
 As the jasypt is AES, for decrypt you must specify the original jasypt encryptor password you used in `set-password` command. There are two common approaches can be used:
 
@@ -248,6 +292,6 @@ If running in IDE, simply add VM options, e.g.,
 
 If running in tomcat, add this `-D` option in `$TOMCAT_HOME/bin/setenv.sh`
 
-## License
+# License
 
 MIT

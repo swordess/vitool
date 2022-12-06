@@ -14,24 +14,24 @@ public class JasyptCommands {
 
     private String password;
 
-    @ShellMethod("Set the jasypt encryptor password.")
+    @ShellMethod(key = "jasypt set-password", value = "Set the jasypt encryptor password.")
     public void jasyptSetPassword(String value) {
         password = value;
     }
 
-    @ShellMethod("Encrypt the given input string.")
+    @ShellMethod(key = "jasypt encrypt", value = "Encrypt the given input string.")
     public String jasyptEncrypt(String input) {
         return getDefaultEncryptor().encrypt(input);
     }
 
-    @ShellMethod("Decrypt the given (encrypted) input string.")
+    @ShellMethod(key = "jasypt decrypt", value = "Decrypt the given (encrypted) input string.")
     public String jasyptDecrypt(String encryptedInput) {
         return getDefaultEncryptor().decrypt(encryptedInput);
     }
 
-    @ShellMethodAvailability({ "jasypt-encrypt", "jasypt-decrypt" })
+    @ShellMethodAvailability({ "jasypt encrypt", "jasypt decrypt" })
     public Availability availabilityCheck() {
-        return !StringUtils.isEmpty(password)
+        return StringUtils.hasText(password)
                 ? Availability.available()
                 : Availability.unavailable("the jasypt encryptor password has not been set yet");
     }
