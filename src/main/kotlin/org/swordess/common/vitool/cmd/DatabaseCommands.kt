@@ -8,7 +8,9 @@
 package org.swordess.common.vitool.cmd
 
 import com.google.gson.GsonBuilder
+import com.google.gson.stream.JsonReader
 import org.jooq.DSLContext
+import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 import org.springframework.shell.Availability
 import org.springframework.shell.standard.ShellComponent
@@ -20,17 +22,24 @@ import org.springframework.shell.table.BorderStyle
 import org.springframework.shell.table.TableBuilder
 import org.springframework.shell.table.TableModel
 import org.swordess.common.vitool.cmd.customize.Quit.Companion.onExit
-import org.swordess.common.vitool.ext.AbstractShellComponent
+import org.swordess.common.vitool.ext.shell.AbstractShellComponent
+import org.swordess.common.vitool.ext.shell.toEnums
+import org.swordess.common.vitool.ext.sql.*
+import org.swordess.common.vitool.ext.storage.*
 import java.lang.RuntimeException
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
+import java.util.*
 
 private const val ENV_VI_DB_URL = "VI_DB_URL"
 private const val ENV_VI_DB_USERNAME = "VI_DB_USERNAME"
 private const val ENV_VI_DB_PASSWORD = "VI_DB_PASSWORD"
 
-private const val NAME_DEFAULT = "default"
+private const val CONNECTION_NAME_DEFAULT = "default"
+
+private const val LOCATION_CONSOLE = "console"
+private const val LOCATION_PREFIX_OSS = "oss://"
 
 private data class ConnectionProperties(
     var url: String? = null,
@@ -48,19 +57,25 @@ private data class DbConnection(
 @ShellComponent
 class DatabaseCommands : AbstractShellComponent() {
 
-    private val gson = GsonBuilder().setPrettyPrinting().create()
+    private val gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
 
     private val namedConnections: MutableMap<String, DbConnection> = mutableMapOf()
 
     private var activeConnection: DbConnection? = null
         set(value) {
-            // change:
-            //   none | connection a    ->    connection b
-            if (field != value && value != null) {
-                if (field == null) {
-                    println("Connection switched from (none) to '${value.name}' .")
-                } else {
-                    field?.let { old ->
+            field.let { old ->
+                // change
+                if (old != value) {
+                    if (old == null) {
+                        // null -> connection
+                        println("Connection switched from (none) to '${value!!.name}' .")
+
+                    } else if (value == null) {
+                        // connection -> null
+                        println("Connection switched from '${old.name}' to (none) .")
+
+                    } else {
+                        // connection a -> connection b
                         println("Connection switched from '${old.name}' to '${value.name}' .")
                     }
                 }
@@ -105,7 +120,7 @@ class DatabaseCommands : AbstractShellComponent() {
             defaultValue = ShellOption.NULL
         ) password: String?,
 
-        @ShellOption(help = "connection name", defaultValue = NAME_DEFAULT) name: String
+        @ShellOption(help = "connection name", defaultValue = CONNECTION_NAME_DEFAULT) name: String
     ) {
         if (namedConnections.containsKey(name)) {
             println("Connection named '$name' already exists, please close it first.")
@@ -136,13 +151,14 @@ class DatabaseCommands : AbstractShellComponent() {
             defaultValue = ShellOption.NULL
         ) name: String?
     ) {
+        val connection = mustConnection(name ?: activeConnection!!.name)
         try {
-            with(mustConnection(name ?: activeConnection!!.name)) {
+            with(connection) {
                 conn.close()
                 println("Connection[name='${this.name}'] has been closed.")
             }
         } finally {
-            namedConnections.remove(name)
+            namedConnections.remove(connection.name)
             activeConnection = null
         }
     }
@@ -266,13 +282,142 @@ class DatabaseCommands : AbstractShellComponent() {
     }
 
 
+    /* ****************************/
+    /* ***** Schema Actions ***** */
+    /* ****************************/
+
+    @ShellMethod(key = ["db schema dump"], value = "Dump all tables as json descriptions.")
+    fun dbSchemaDump(
+        @ShellOption(
+            help = "location for saving the descriptions. Possible values are: '${LOCATION_CONSOLE}' | '${LOCATION_PREFIX_OSS}...' | <file> ",
+            defaultValue = LOCATION_CONSOLE
+        ) to: String,
+        @ShellOption(help = "use pretty json or not", defaultValue = "false") pretty: Boolean,
+        @ShellOption(
+            help = "connection name, default to current active connection's name",
+            defaultValue = ShellOption.NULL
+        ) name: String?
+    ) {
+        val conn = mustConnection(name ?: activeConnection!!.name)
+        println("(Using connection[name='${conn.name}'] ...)\n")
+
+        val schemaDesc = querySchemaDescription(conn)
+        writeJson(schemaDesc, to, pretty) {
+            if (schemaDesc.tables.size > 1) {
+                println("${schemaDesc.tables.size} table descriptions have be written to \"$it\" .")
+            } else {
+                println("${schemaDesc.tables.size} table description has be written to \"$it\" .")
+            }
+        }
+    }
+
+    private fun querySchemaDescription(connection: DbConnection): SchemaDesc {
+        val tableDescs = mutableListOf<TableDesc>()
+
+        with(connection.create) {
+            if (configuration().dialect() != SQLDialect.MYSQL) {
+                throw RuntimeException("Only mysql is supported.")
+            }
+
+            val tableNames = resultQuery("show tables").use { it.fetchInto(String::class.java) }
+
+            tableNames.forEach { tableName ->
+                // Two columns will be returned: `Table`, `Create Table`. Use `fetchOne` for simplicity.
+                val createTableSql: String? =
+                    resultQuery("show create table $tableName").use { it.fetchOne(1, String::class.java) }
+
+                createTableSql?.let {
+                    tableDescs.add(parseCreateTable(it))
+                }
+            }
+        }
+
+        return SchemaDesc(tableDescs, Date())
+    }
+
+    @ShellMethod(
+        key = ["db schema diff"],
+        value = "Compute differences of two table descriptions."
+    )
+    fun dbSchemaDiff(
+        @ShellOption(help = "location for getting the left side descriptions. Possible values are: <connection_name> | '${LOCATION_PREFIX_OSS}...' | <file>") left: String,
+        @ShellOption(help = "location for getting the right side descriptions. Possible values are: <connection_name> | '${LOCATION_PREFIX_OSS}...' | <file>") right: String,
+        @ShellOption(
+            help = "location for saving the descriptions. Possible values are: '${LOCATION_CONSOLE}' | '${LOCATION_PREFIX_OSS}...' | <file>",
+            defaultValue = LOCATION_CONSOLE
+        ) to: String,
+        @ShellOption(help = "use pretty json or not", defaultValue = "true") pretty: Boolean,
+        @ShellOption(help = "ignore sql features, comma(',') separated. Possible values are: comment, index_storage_type, row_format", defaultValue = ShellOption.NULL) ignore: String?
+    ) {
+        val ignores = ignore?.toEnums<SqlFeature>() ?: emptySet()
+
+        val leftDesc =
+            left.toSourceDescriptionProvider { println("Left side descriptions have been loaded from \"$it\" .") }.invoke()
+        val rightDesc =
+            right.toSourceDescriptionProvider { println("Right side descriptions have been loaded from \"$it\" .") }.invoke()
+
+        val schemaDiff = diff(leftDesc, rightDesc, ignores)
+
+        if (schemaDiff.tables.isEmpty() && schemaDiff.insideTables.isEmpty()) {
+            println("(No differences.)")
+            return
+        }
+
+        writeJson(schemaDiff, to, pretty) {
+            println("Differences have been written to \"$it\" .")
+        }
+    }
+
+    private fun writeJson(data: Any, to: String, pretty: Boolean, callback: (Any?) -> Unit) {
+        val gson = GsonBuilder().apply {
+            disableHtmlEscaping()
+            if (pretty) {
+                setPrettyPrinting()
+            }
+        }.create()
+
+        to.toDestDescriptionStorage().write(gson.toJson(data).toByteArray(), callback)
+    }
+
+    private fun String.toDestDescriptionStorage(): WriteableStorage<out Any> =
+        if (this == LOCATION_CONSOLE) {
+            ConsoleStorage
+        } else if (startsWith(LOCATION_PREFIX_OSS)) {
+            // oss://<akId>:<akSecret>@bucket.endpoint.addr/path/to/foo.json
+            TODO()
+        } else {
+            FileStorage(this)
+        }
+
+    private fun String.toSourceDescriptionProvider(callback: (String) -> Unit): () -> SchemaDesc {
+        if (this in namedConnections) {
+            val connection = namedConnections[this]!!
+            return {
+                val result = querySchemaDescription(connection)
+                callback.invoke("connection[name='${connection.name}']")
+                result
+            }
+
+        } else if (startsWith(LOCATION_PREFIX_OSS)) {
+            TODO()
+
+        } else {
+            val s = FileStorage(this)
+            return {
+                val result: SchemaDesc =
+                    gson.fromJson(JsonReader(s.read().inputStream().reader()), SchemaDesc::class.java)
+                callback.invoke(this)
+                result
+            }
+        }
+    }
 
 
     private fun mustConnection(name: String): DbConnection =
         namedConnections[name]
             ?: throw RuntimeException("there is no connection named '$name', possible values are: ${namedConnections.keys}")
 
-    @ShellMethodAvailability("db query", "db command", "db close", "db reconnect")
+    @ShellMethodAvailability("db query", "db command", "db close", "db reconnect", "db schema dump")
     fun availabilityCheck(): Availability =
         if (activeConnection != null) Availability.available() else Availability.unavailable("the connection is not established")
 

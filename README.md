@@ -7,6 +7,7 @@ CLI tools, independent of business.
 - [Planned Tasks](#planned-tasks)
 - [Features](#features)
 - [Changes](#changes)
+  - [1.2.0](#120)
   - [1.1.1](#111)
   - [1.1.0](#110)
 - [Installation](#installation)
@@ -16,6 +17,11 @@ CLI tools, independent of business.
   - [Jasypt Commands](#jasypt-commands)
   - [Aliyun Oss Commands](#aliyun-oss-commands)
   - [Database Commands](#database-commands)
+    - [Connection Management](#connection-management)
+    - [Multi Connection](#multi-connection)
+    - [Execute Query](#execute-a-query)
+    - [Execute Command](#execute-dml-statement)
+    - [Schema Actions](#schema-actions)
 - [Integration](#integration)
   - [Jasypt Spring Boot Integration](#jasypt-spring-boot-integration)
 - [License](#license)
@@ -36,6 +42,13 @@ Feature | Version
 [Aliyun Oss Commands](#aliyun-oss-commands), [Jasypt Commands](#jasypt-commands) | since 1.0.0
 
 # Changes
+
+## 1.2.0
+
+- Automatic resource cleanup when hitting `Ctrl + c`.
+- Rewrite in Kotlin. (Reason: this project would be written in kotlin-native when appropriate)
+- Multi-connection by introducing new commands: `db connections`, `db switch`
+- Database schema dump and compare: `db schema dump`, `db schema diff`
 
 ## 1.1.1
 
@@ -119,7 +132,7 @@ For how to setup your STS, see: [STS临时授权访问OSS](https://help.aliyun.c
 Outputs SUCCESS if works:
 
 ```
-vitool:> aliyun-oss-verify-sts --region 'cn-hangzhou' --access-key-id your_access_key_id --access-key-secret your_access_key_secret --arn 'your_arn'
+vitool:> alioss verify-sts --region 'cn-hangzhou' --access-key-id your_access_key_id --access-key-secret your_access_key_secret --arn 'your_arn'
 SUCCESS
 	Expiration: 2019-12-02T07:42:33Z
 	Access Key Id: STS.NUposKnuoZrHejWQoRTJxMvmu
@@ -130,7 +143,7 @@ SUCCESS
 
 Otherwise a FAILURE, e.g.:
 ```
-vitool:> aliyun-oss-verify-sts --region 'ch-hangzhou' --access-key-id your_access_key_id --access-key-secret your_access_key_secret --arn 'your_arn'
+vitool:> alioss verify-sts --region 'ch-hangzhou' --access-key-id your_access_key_id --access-key-secret your_access_key_secret --arn 'your_arn'
 FAILURE
 	Error code: SDK.InvalidRegionId
 	Error message: Can not find endpoint to access.
@@ -143,6 +156,7 @@ These commands are designed to be used when:
 - it's hard to get or download a library(, client, ... whatever) to connect to your database
 - or you need to check some data is right there
 - or you want to do some changes to existed data
+- or you want to dump and compare schemas
 
 And not be used when:
 - you want to get precisely the same query output against a certain database's official CLI tool
@@ -162,14 +176,16 @@ You can pass connection properties either in the shell directly, or via environm
 Via shell:
 ```
 vitool:> db connect jdbc:mysql://localhost:3306/demo your_username your_password
-Connection has been established.
+Connection[name='default'] has been established.
+Connection switched from (none) to 'default' .
 ```
 
 As all the commands you typed in the interactive shell will be recorded in a log file, for security concern, you can provide the password via input as well:
 ```
 vitool:> db connect jdbc:mysql://localhost:3306/demo your_username
 ? Enter password: *************
-Connection has been established.
+Connection[name='default'] has been established.
+Connection switched from (none) to 'default' .
 ```
 
 Via environment variable:
@@ -180,14 +196,16 @@ $ EXPORT VI_DB_PASSWORD=your_password
 
 # then connect
 vitool:> db connect
-Connection has been established.
+Connection[name='default'] has been established.
+Connection switched from (none) to 'default' .
 ```
 
 Once your work has been done, close the connection with:
 
 ```
 vitool:> db close
-Connection has been closed.
+Connection[name='default'] has been closed.
+Connection switched from 'default' to (none) .
 ```
 
 > Since `1.1.1`, you can leave the connection closing behind when `quit` (`exit`). It will be automatically called right before the program exit. But for connection property changes, a `db close` is still needed.
@@ -195,8 +213,47 @@ Connection has been closed.
 In case any edge cases leading to a broken connection, you may re-establish with:
 ```
 vitool:> db reconnect
-Connection has been closed.
-Connection has been established.
+Connection[name='default'] has been closed.
+Connection switched from 'default' to (none) .
+Connection[name='default'] has been established.
+Connection switched from (none) to 'default' .
+```
+
+### Multi Connection
+
+Connection has a name, and default to `default` if not specified. For managing multiple database connections, name it by using the `--name` option.
+
+For example, add a connection named `test`:
+```
+vitool:> db connect jdbc:mysql://test.ip:3306/testdb your_username --name test
+? Enter password: *************
+Connection[name='test'] has been established.
+Connection switched from (none) to 'test' .
+```
+
+And view all connections:
+```
+vitool:> db connections
+default:
+    url: jdbc:mysql://localhost:3306/demo
+    username: your_username
+* test:
+    url: jdbc:mysql://test.ip:3306/testdb
+    username: your_username
+```
+The connection leading with an asterisks is your current active connection.
+
+For switching a connection, use:
+```
+vitool:> db switch default
+Connection switched from 'test' to 'default' .
+```
+
+Close a connection:
+```
+vitool:> db close test
+Connection[name='test'] has been closed.
+Connection switched from 'test' to (none) .
 ```
 
 ### Execute a query
@@ -221,6 +278,140 @@ You are responsible to guarantee the sql integrity, the whole sql statement shou
 vitool:> db command "insert into t_example (`account_id`, `log_ts`, `amount`) values ('2', '2022-12-01 10:00:00.000', '99')"
 1 row(s) affected
 ```
+
+### Schema Actions
+
+Chances are that you want to know the differences of two database instances, each instance is used in one project environment.
+
+These commands are designed to accomplish this task!
+
+> NOTE: Currently only MySQL is supported .
+
+#### Dump
+
+For dumping a schema:
+```
+vitool:> db schema dump example.json
+(Using connection[name='default'] ...)
+
+4 table descriptions have be written to "/Users/viclau/project/github/vitool/example.json" .
+```
+
+And the usage help:
+```
+vitool:> help db schema dump
+NAME
+       db schema dump - Dump all tables as json descriptions.
+
+SYNOPSIS
+       db schema dump --to String --pretty boolean --name String
+
+OPTIONS
+       --to String
+       location for saving the descriptions. Possible values are: 'console' | 'oss://...' | <file> 
+       [Optional, default = console]
+
+       --pretty boolean
+       use pretty json or not
+       [Optional, default = false]
+
+       --name String
+       connection name, default to current active connection's name
+       [Optional]
+```
+
+#### Compare
+
+For comparing two schemas:
+```
+vitool:> db schema diff dev.json test.json dev_vs_test.json
+Differences have been written to "/Users/viclau/project/github/vitool/dev_vs_test.json" .
+```
+
+And the usage help:
+```
+vitool:>help db schema diff
+NAME
+       db schema diff - Compute differences of two table descriptions.
+
+SYNOPSIS
+       db schema diff [--left String] [--right String] --to String --pretty boolean --ignore String
+
+OPTIONS
+       --left String
+       location for getting the left side descriptions. Possible values are: <connection_name> | 'oss://...' | <file>
+       [Mandatory]
+
+       --right String
+       location for getting the right side descriptions. Possible values are: <connection_name> | 'oss://...' | <file>
+       [Mandatory]
+
+       --to String
+       location for saving the descriptions. Possible values are: 'console' | 'oss://...' | <file>
+       [Optional, default = console]
+
+       --pretty boolean
+       use pretty json or not
+       [Optional, default = true]
+
+       --ignore String
+       ignore sql features, comma(',') separated. Possible values are: comment, index_storage_type, row_format
+       [Optional]
+```
+
+> Use `--ignore` option to tell the command to ignore some sql structures when computing the differences.
+> 
+> For example, pass `--ignore comment,row_format` if your don't care differences that exist in table comments, column comments and table row format.
+
+#### Schema Diff: the format of the produced differences
+
+After running a `db schema diff`, you would get a json file, the schema difference file. It looks like:
+
+```json
+{
+  "tables": [
+    {
+      "left": {
+        "name": "`foo_table`",
+        "sql": "CREATE TABLE `foo_table` ..."
+      }
+    },
+    {
+      "right": {
+        "name": "`bar_table`",
+        "sql": "CREATE TABLE `bar_table` ..."
+      }
+    }
+  ],
+  "insideTables": [
+    {
+      "name": "`some_table`",
+      "columns": [
+        {
+          "left": "`description` varchar (512) DEFAULT NULL COMMENT '描述'"
+        },
+        {
+          "left": "`appoint_time` datetime DEFAULT NULL COMMENT '预约日期'",
+          "right": "`appoint_time` date DEFAULT NULL COMMENT '预约日期'"
+        }
+      ],
+      "indexes": [
+        {
+          "left": "KEY `idx_customer_name` (`customer_name`) USING BTREE"
+        }
+      ],
+      "option": {
+        "left": "ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 ROW_FORMAT = DYNAMIC COMMENT = 'XXX表' shardkey = user_id",
+        "right": "ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 ROW_FORMAT = DYNAMIC COMMENT = 'XXX表'"
+      }
+    }
+  ]
+}
+```
+
+- `tables` indicate those are entirely missing in a database
+  - if `left` is present, and `right` is missing, it means this table is not found in the schema that is specified by the `--right` option
+- `insideTables` indicate tables both are existed in the two schemas, but have concrete differences: columns, indexes, or table options 
 
 # Integration
 

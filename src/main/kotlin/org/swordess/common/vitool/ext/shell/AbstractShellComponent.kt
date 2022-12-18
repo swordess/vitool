@@ -5,7 +5,7 @@
  * See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
  */
 
-package org.swordess.common.vitool.ext
+package org.swordess.common.vitool.ext.shell
 
 import org.springframework.shell.component.StringInput
 import org.springframework.shell.component.StringInput.StringInputContext
