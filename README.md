@@ -65,10 +65,24 @@ Feature | Version
 
 # Installation
 
+## From Release Artifacts
+
+Simply download a released jar file on the release page, and run with your local JRE.
+
+> The project is developed using Java 8.
+> 
+> Other Java version is not guaranteed to fully functioning, but you can give it a try!
+
+```shell
+$ wget https://github.com/swordess/vitool/releases/download/v1.2.0/vitool-1.2.0.jar
+$ java -jar vitool-1.2.0.jar
+```
+
 ## From Docker
 
 Supported tags:
-- latest, 1.1.1
+- latest, 1.2.0
+- 1.1.1
 - 1.1.0
 - 1.0.0
 
