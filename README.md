@@ -413,6 +413,52 @@ After running a `db schema diff`, you would get a json file, the schema differen
   - if `left` is present, and `right` is missing, it means this table is not found in the schema that is specified by the `--right` option
 - `insideTables` indicate tables both are existed in the two schemas, but have concrete differences: columns, indexes, or table options 
 
+#### Write to (Read from) Aliyun OSS
+
+You might have noticed the Schema Actions support the `oss://` protocol in some options. The form of an OSS file url is:
+```
+oss://[<accessId>[:<accessSecret>]]@<protocol>://<bucket>.<endpoint>/<path>`
+```
+
+Both the `accessId` and `accessSecret` are optional. And the order of determine the values are:
+- read from url string. If not found, then
+- read from environment variables (`VI_OSS_ACCESS_ID` and `VI_OSS_ACCESS_SECRET`). If not found, then
+- prompts for missing values
+
+To clarify the usage, see following examples.
+
+> Examples for demonstrating the environment variables are not included, hands on by yourself :)
+
+**Example 1. both unspecified, thus two prompts are shown**
+
+```
+vitool:>db schema dump oss://https://viclau-s.oss-cn-beijing.aliyuncs.com/vitool/mysql_local.json
+(Using connection[name='default'] ...)
+
+? Enter OSS access id: i1oVNSvejfYIBWO0aUakag8F
+? Enter OSS access secret: ******************************
+4 table descriptions have be written to "https://viclau-s.oss-cn-beijing.aliyuncs.com/vitool/mysql_local.json" .
+```
+
+**Example 2. only `accessId` is specified, thus prompt for a `accessSecret` is shown**
+
+```
+vitool:>db schema dump oss://i1oVNSvejfYIBWO0aUakag8F@https://viclau-s.oss-cn-beijing.aliyuncs.com/vitool/mysql_local.json
+(Using connection[name='default'] ...)
+
+? Enter OSS access secret: ******************************
+4 table descriptions have be written to "https://viclau-s.oss-cn-beijing.aliyuncs.com/vitool/mysql_local.json" .
+```
+
+**Example 3. both specified (not recommended)**
+
+```
+vitool:>db schema dump oss://i1oVNSvejfYIBWO0aUakag8F:2vhMi9Ii5Gppbi1UClQdpcQfU1zWVc@https://viclau-s.oss-cn-beijing.aliyuncs.com/vitool/mysql_local.json
+(Using connection[name='default'] ...)
+
+4 table descriptions have be written to "https://viclau-s.oss-cn-beijing.aliyuncs.com/vitool/mysql_local.json" .
+```
+
 # Integration
 
 ## Jasypt Spring Boot Integration

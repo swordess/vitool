@@ -21,9 +21,10 @@ import org.springframework.shell.table.ArrayTableModel
 import org.springframework.shell.table.BorderStyle
 import org.springframework.shell.table.TableBuilder
 import org.springframework.shell.table.TableModel
-import org.swordess.common.vitool.cmd.customize.Quit.Companion.onExit
+import org.swordess.common.vitool.cmd.customize.Quit
 import org.swordess.common.vitool.ext.shell.AbstractShellComponent
 import org.swordess.common.vitool.ext.shell.toEnums
+import org.swordess.common.vitool.ext.shell.toOssFileProperties
 import org.swordess.common.vitool.ext.sql.*
 import org.swordess.common.vitool.ext.storage.*
 import java.lang.RuntimeException
@@ -31,10 +32,14 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
 import java.util.*
+import kotlin.properties.Delegates
 
 private const val ENV_VI_DB_URL = "VI_DB_URL"
 private const val ENV_VI_DB_USERNAME = "VI_DB_USERNAME"
 private const val ENV_VI_DB_PASSWORD = "VI_DB_PASSWORD"
+
+private const val ENV_VI_OSS_ACCESS_ID = "VI_OSS_ACCESS_ID"
+private const val ENV_VI_OSS_ACCESS_SECRET = "VI_OSS_ACCESS_SECRET"
 
 private const val CONNECTION_NAME_DEFAULT = "default"
 
@@ -61,32 +66,26 @@ class DatabaseCommands : AbstractShellComponent() {
 
     private val namedConnections: MutableMap<String, DbConnection> = mutableMapOf()
 
-    private var activeConnection: DbConnection? = null
-        set(value) {
-            field.let { old ->
-                // change
-                if (old != value) {
-                    if (old == null) {
-                        // null -> connection
-                        println("Connection switched from (none) to '${value!!.name}' .")
+    private var activeConnection: DbConnection? by Delegates.observable(null) { _, old, new ->
+        // change
+        if (old != new) {
+            if (old == null) {
+                // null -> connection
+                println("Connection switched from (none) to '${new!!.name}' .")
 
-                    } else if (value == null) {
-                        // connection -> null
-                        println("Connection switched from '${old.name}' to (none) .")
+            } else if (new == null) {
+                // connection -> null
+                println("Connection switched from '${old.name}' to (none) .")
 
-                    } else {
-                        // connection a -> connection b
-                        println("Connection switched from '${old.name}' to '${value.name}' .")
-                    }
-                }
+            } else {
+                // connection a -> connection b
+                println("Connection switched from '${old.name}' to '${new.name}' .")
             }
-
-            field = value
         }
+    }
 
-    override fun afterPropertiesSet() {
-        super.afterPropertiesSet()
-        onExit {
+    init {
+        Quit.onExit {
             try {
                 // `dbClose` modified the `namedConnections`, so make a copy to avoid ConcurrentModificationException
                 namedConnections.keys.toList().forEach {
@@ -347,14 +346,19 @@ class DatabaseCommands : AbstractShellComponent() {
             defaultValue = LOCATION_CONSOLE
         ) to: String,
         @ShellOption(help = "use pretty json or not", defaultValue = "true") pretty: Boolean,
-        @ShellOption(help = "ignore sql features, comma(',') separated. Possible values are: comment, index_storage_type, row_format", defaultValue = ShellOption.NULL) ignore: String?
+        @ShellOption(
+            help = "ignore sql features, comma(',') separated. Possible values are: comment, index_storage_type, row_format",
+            defaultValue = ShellOption.NULL
+        ) ignore: String?
     ) {
         val ignores = ignore?.toEnums<SqlFeature>() ?: emptySet()
 
-        val leftDesc =
-            left.toSourceDescriptionProvider { println("Left side descriptions have been loaded from \"$it\" .") }.invoke()
-        val rightDesc =
-            right.toSourceDescriptionProvider { println("Right side descriptions have been loaded from \"$it\" .") }.invoke()
+        val leftDesc = left.toSourceDescriptionProvider {
+            println("Left side descriptions have been loaded from \"$it\" .")
+        }.invoke()
+        val rightDesc = right.toSourceDescriptionProvider {
+            println("Right side descriptions have been loaded from \"$it\" .")
+        }.invoke()
 
         val schemaDiff = diff(leftDesc, rightDesc, ignores)
 
@@ -379,14 +383,13 @@ class DatabaseCommands : AbstractShellComponent() {
         to.toDestDescriptionStorage().write(gson.toJson(data).toByteArray(), callback)
     }
 
-    private fun String.toDestDescriptionStorage(): WriteableStorage<out Any> =
+    private fun String.toDestDescriptionStorage(): WriteableData<out Any> =
         if (this == LOCATION_CONSOLE) {
-            ConsoleStorage
+            ConsoleData
         } else if (startsWith(LOCATION_PREFIX_OSS)) {
-            // oss://<akId>:<akSecret>@bucket.endpoint.addr/path/to/foo.json
-            TODO()
+            toOssData()
         } else {
-            FileStorage(this)
+            FileData(this)
         }
 
     private fun String.toSourceDescriptionProvider(callback: (String) -> Unit): () -> SchemaDesc {
@@ -399,19 +402,34 @@ class DatabaseCommands : AbstractShellComponent() {
             }
 
         } else if (startsWith(LOCATION_PREFIX_OSS)) {
-            TODO()
+            val data = toOssData()
+            return {
+                gson.fromJson(JsonReader(data.read(callback).inputStream().reader()), SchemaDesc::class.java)
+            }
 
         } else {
-            val s = FileStorage(this)
+            val data = FileData(this)
             return {
-                val result: SchemaDesc =
-                    gson.fromJson(JsonReader(s.read().inputStream().reader()), SchemaDesc::class.java)
-                callback.invoke(this)
-                result
+                gson.fromJson(JsonReader(data.read(callback).inputStream().reader()), SchemaDesc::class.java)
             }
         }
     }
 
+    private fun String.toOssData(): OssData {
+        val props = toOssFileProperties()
+
+        props.accessId = props.accessId
+            .orEnv(ENV_VI_OSS_ACCESS_ID)
+            .orInput("Enter OSS access id:", mask = false)
+            .must("OSS access id cannot be inferred")
+
+        props.accessSecret = props.accessSecret
+            .orEnv(ENV_VI_OSS_ACCESS_SECRET)
+            .orInput("Enter OSS access secret:")
+            .must("OSS access id cannot be inferred")
+
+        return OssData(props)
+    }
 
     private fun mustConnection(name: String): DbConnection =
         namedConnections[name]
