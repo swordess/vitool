@@ -4,13 +4,14 @@ CLI tools, independent of business.
 
 # Table of Contents
 
-- [Planned Tasks](#planned-tasks)
+- [What's next?](#whats-next)
 - [Features](#features)
 - [Changes](#changes)
   - [1.2.0](#120)
   - [1.1.1](#111)
   - [1.1.0](#110)
 - [Installation](#installation)
+  - [From Release Artifacts](#from-release-artifacts) 
   - [From Docker](#from-docker)
   - [Build From Source](#build-from-source)
 - [Commands](#commands)
@@ -26,13 +27,16 @@ CLI tools, independent of business.
   - [Jasypt Spring Boot Integration](#jasypt-spring-boot-integration)
 - [License](#license)
 
-# Planned Tasks
+# What's next?
 
 - add unit tests, coverage rate > 90% is promised at this stage
 - ~~deploy to a public maven repo (JCenter Bintray, maybe), so that it's possible to embed this lib to a larger project~~
   - Updates 2022.12.01: Cancelled, the JCenter Bintray has been shutdown, and there is no embedding case in general.
 - ~~deploy to the Docker hub, as client side's convenience comes first for a tool~~
   - Updates 2020.05.14: Done
+- file copy command to read content from following locations, then save to oss
+  - a local file
+  - a Http Rest API 
 
 # Features
 
