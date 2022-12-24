@@ -7,6 +7,7 @@ CLI tools, independent of business.
 - [What's next?](#whats-next)
 - [Features](#features)
 - [Changes](#changes)
+  - [1.2.1](#121) 
   - [1.2.0](#120)
   - [1.1.1](#111)
   - [1.1.0](#110)
@@ -42,6 +43,7 @@ CLI tools, independent of business.
 
 Feature | Version
 -|-
+Release Commands | since 1.2.1
 [Database Commands](#database-commands) | since 1.1.0
 [Aliyun Oss Commands](#aliyun-oss-commands), [Jasypt Commands](#jasypt-commands) | since 1.0.0
 
@@ -90,12 +92,6 @@ $ java -jar vitool-1.2.0.jar
 ```
 
 ## From Docker
-
-Supported tags:
-- latest, 1.2.0
-- 1.1.1
-- 1.1.0
-- 1.0.0
 
 ```
 docker pull xingyuli/vitool:<tag>
