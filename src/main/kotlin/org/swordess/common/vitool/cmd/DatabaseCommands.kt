@@ -12,18 +12,23 @@ import com.google.gson.stream.JsonReader
 import org.jooq.DSLContext
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
+import org.springframework.context.annotation.Bean
 import org.springframework.shell.Availability
+import org.springframework.shell.CompletionContext
+import org.springframework.shell.CompletionProposal
+import org.springframework.shell.command.CommandRegistration
+import org.springframework.shell.standard.EnumValueProvider
 import org.springframework.shell.standard.ShellComponent
 import org.springframework.shell.standard.ShellMethod
 import org.springframework.shell.standard.ShellMethodAvailability
 import org.springframework.shell.standard.ShellOption
+import org.springframework.shell.standard.ValueProvider
 import org.springframework.shell.table.ArrayTableModel
 import org.springframework.shell.table.BorderStyle
 import org.springframework.shell.table.TableBuilder
 import org.springframework.shell.table.TableModel
 import org.swordess.common.vitool.cmd.customize.Quit
 import org.swordess.common.vitool.ext.shell.AbstractShellComponent
-import org.swordess.common.vitool.ext.shell.toEnums
 import org.swordess.common.vitool.ext.shell.toOssFileProperties
 import org.swordess.common.vitool.ext.sql.*
 import org.swordess.common.vitool.ext.storage.*
@@ -147,7 +152,8 @@ class DatabaseCommands : AbstractShellComponent() {
     fun dbClose(
         @ShellOption(
             help = "connection name, default to current active connection's name",
-            defaultValue = ShellOption.NULL
+            defaultValue = ShellOption.NULL,
+            valueProvider = ConnectionNameProvider::class
         ) name: String?
     ) {
         val connection = mustConnection(name ?: activeConnection!!.name)
@@ -166,7 +172,8 @@ class DatabaseCommands : AbstractShellComponent() {
     fun dbReconnect(
         @ShellOption(
             help = "connection name, default to current active connection's name",
-            defaultValue = ShellOption.NULL
+            defaultValue = ShellOption.NULL,
+            valueProvider = ConnectionNameProvider::class
         ) name: String?
     ) {
         with(mustConnection(name ?: activeConnection!!.name)) {
@@ -190,7 +197,7 @@ class DatabaseCommands : AbstractShellComponent() {
     }
 
     @ShellMethod(key = ["db switch"], value = "Switch active connection to specified one.")
-    fun dbSwitch(@ShellOption(help = "connection-name") name: String) {
+    fun dbSwitch(@ShellOption(help = "connection-name", valueProvider = ConnectionNameProvider::class) name: String) {
         if (name == activeConnection?.name) {
             println("(Nothing happened.)")
             return
@@ -208,12 +215,17 @@ class DatabaseCommands : AbstractShellComponent() {
     fun dbQuery(
         sql: String,
 
-        @ShellOption(help = "the output format when displaying the result", defaultValue = "table")
+        @ShellOption(
+            help = "the output format when displaying the result",
+            defaultValue = "table",
+            valueProvider = EnumValueProvider::class
+        )
         format: QueryFormat,
 
         @ShellOption(
             help = "connection name, default to current active connection's name",
-            defaultValue = ShellOption.NULL
+            defaultValue = ShellOption.NULL,
+            valueProvider = ConnectionNameProvider::class
         ) name: String? = null
     ): Any? {
         val conn = mustConnection(name ?: activeConnection!!.name)
@@ -268,7 +280,8 @@ class DatabaseCommands : AbstractShellComponent() {
         sql: String,
         @ShellOption(
             help = "connection name, default to current active connection's name",
-            defaultValue = ShellOption.NULL
+            defaultValue = ShellOption.NULL,
+            valueProvider = ConnectionNameProvider::class
         ) name: String?
     ) {
         val conn = mustConnection(name ?: activeConnection!!.name)
@@ -294,7 +307,8 @@ class DatabaseCommands : AbstractShellComponent() {
         @ShellOption(help = "use pretty json or not", defaultValue = "false") pretty: Boolean,
         @ShellOption(
             help = "connection name, default to current active connection's name",
-            defaultValue = ShellOption.NULL
+            defaultValue = ShellOption.NULL,
+            valueProvider = ConnectionNameProvider::class
         ) name: String?
     ) {
         val conn = mustConnection(name ?: activeConnection!!.name)
@@ -334,25 +348,7 @@ class DatabaseCommands : AbstractShellComponent() {
         return SchemaDesc(tableDescs, Date())
     }
 
-    @ShellMethod(
-        key = ["db schema diff"],
-        value = "Compute differences of two table descriptions."
-    )
-    fun dbSchemaDiff(
-        @ShellOption(help = "location for getting the left side descriptions. Possible values are: <connection_name> | '${LOCATION_PREFIX_OSS}...' | <file>") left: String,
-        @ShellOption(help = "location for getting the right side descriptions. Possible values are: <connection_name> | '${LOCATION_PREFIX_OSS}...' | <file>") right: String,
-        @ShellOption(
-            help = "location for saving the descriptions. Possible values are: '${LOCATION_CONSOLE}' | '${LOCATION_PREFIX_OSS}...' | <file>",
-            defaultValue = LOCATION_CONSOLE
-        ) to: String,
-        @ShellOption(help = "use pretty json or not", defaultValue = "true") pretty: Boolean,
-        @ShellOption(
-            help = "ignore sql features, comma(',') separated. Possible values are: comment, index_storage_type, row_format",
-            defaultValue = ShellOption.NULL
-        ) ignore: String?
-    ) {
-        val ignores = ignore?.toEnums<SqlFeature>() ?: emptySet()
-
+    private fun dbSchemaDiff(left: String, right: String, to: String, pretty: Boolean, ignores: Set<SqlFeature>) {
         val leftDesc = left.toSourceDescriptionProvider {
             println("Left side descriptions have been loaded from \"$it\" .")
         }.invoke()
@@ -370,6 +366,57 @@ class DatabaseCommands : AbstractShellComponent() {
         writeJson(schemaDiff, to, pretty) {
             println("Differences have been written to \"$it\" .")
         }
+    }
+
+    @Bean
+    fun dbSchemaDiffRegistration(): CommandRegistration {
+        return CommandRegistration.builder()
+            .group("Database Commands")
+            .command("db schema diff")
+            .description("Compute differences of two table descriptions.")
+            .withOption()
+                .longNames("left")
+                .description("location for getting the left side descriptions. Possible values are: <connection_name> | '${LOCATION_PREFIX_OSS}...' | <file>")
+                .required()
+                .and()
+            .withOption()
+                .longNames("right")
+                .description("location for getting the right side descriptions. Possible values are: <connection_name> | '${LOCATION_PREFIX_OSS}...' | <file>")
+                .required()
+                .and()
+            .withOption()
+                .longNames("to")
+                .description("location for saving the descriptions. Possible values are: '${LOCATION_CONSOLE}' | '${LOCATION_PREFIX_OSS}...' | <file>")
+                .defaultValue(LOCATION_CONSOLE)
+                .and()
+            .withOption()
+                .longNames("pretty")
+                .description("use pretty json or not")
+                .defaultValue("true")
+                .type(Boolean::class.java)
+                .and()
+            .withOption()
+                .longNames("ignore")
+                .description("ignore sql features. Possible values are: ${enumValues<SqlFeature>().joinToString(", ")}")
+                .required(false)
+                .type(SqlFeature::class.java)
+                .arity(1, enumValues<SqlFeature>().size)
+                .completion(EnumValueProvider()::complete)
+                .and()
+            .withTarget()
+                .consumer { ctx ->
+                    val ignore = ctx.parserResults.results()
+                        .filter { "ignore" in it.option().longNames }
+                        .map { it.value() as SqlFeature }
+                    dbSchemaDiff(
+                        ctx.getOptionValue("left"),
+                        ctx.getOptionValue("right"),
+                        ctx.getOptionValue("to"),
+                        ctx.getOptionValue("pretty"),
+                        ignore.toSet())
+                }
+                .and()
+            .build()
     }
 
     private fun writeJson(data: Any, to: String, pretty: Boolean, callback: (Any?) -> Unit) {
@@ -426,7 +473,7 @@ class DatabaseCommands : AbstractShellComponent() {
         props.accessSecret = props.accessSecret
             .orEnv(ENV_VI_OSS_ACCESS_SECRET)
             .orInput("Enter OSS access secret:")
-            .must("OSS access id cannot be inferred")
+            .must("OSS access secret cannot be inferred")
 
         return OssData(props)
     }
@@ -435,8 +482,32 @@ class DatabaseCommands : AbstractShellComponent() {
         namedConnections[name]
             ?: throw RuntimeException("there is no connection named '$name', possible values are: ${namedConnections.keys}")
 
+
+    /* *****************************/
+    /* ***** Value Providers ***** */
+    /* *****************************/
+
+    inner class ConnectionNameProvider : ValueProvider {
+        override fun complete(completionContext: CompletionContext): MutableList<CompletionProposal> =
+            namedConnections.keys.map { CompletionProposal(it) }.toMutableList()
+
+    }
+
+    @Bean
+    fun connectionNameProvider() = ConnectionNameProvider()
+
+
+    /* **************************/
+    /* ***** Availability ***** */
+    /* **************************/
+
     @ShellMethodAvailability("db query", "db command", "db close", "db reconnect", "db schema dump")
     fun availabilityCheck(): Availability =
-        if (activeConnection != null) Availability.available() else Availability.unavailable("the connection is not established")
+        if (activeConnection != null) Availability.available()
+        else {
+            val msg =
+                if (namedConnections.isEmpty()) "the connection is not established" else "none of connections among ${namedConnections.keys} is activated"
+            Availability.unavailable(msg)
+        }
 
 }

@@ -1,3 +1,9 @@
+spring:
+  shell:
+    command:
+      version:
+        show-build-time: true
+
 logging:
   level:
     org.jooq: WARN

@@ -67,6 +67,7 @@ data class StringDiff(val left: String?, val right: String?)
 enum class SqlFeature {
     comment,
     index_storage_type,
+    auto_increment_id,
     row_format
 }
 
@@ -75,7 +76,7 @@ fun parseCreateTable(sql: String): TableDesc = with(CCJSqlParserUtil.parse(sql) 
         ColumnDesc(
             it.columnName,
             it.colDataType.toString(),
-            it.columnSpecs,
+            it.columnSpecs ?: emptyList(),
             it.toString()
         )
     }
@@ -109,7 +110,7 @@ fun diff(left: SchemaDesc, right: SchemaDesc, ignores: Set<SqlFeature>): SchemaD
 
         // in right, but not in left
         addAll((rightTableNames - leftTableNames.toSet()).map { rightTableName ->
-            val rightTable = left.tables.first { it.name == rightTableName }
+            val rightTable = right.tables.first { it.name == rightTableName }
             TableMissingDiff(left = null, right = TableDdl(rightTable.name, rightTable.rawSql))
         })
     }
@@ -165,6 +166,8 @@ private fun IndexDesc.ignore(feature: SqlFeature): IndexDesc = when(feature) {
 private fun Options.ignore(feature: SqlFeature): Options = when (feature) {
     // snippet: comment '日志表'
     SqlFeature.comment -> exclude(fromElement = "COMMENT", count = 2)
+    // snippet: AUTO_INCREMENT = 804
+    SqlFeature.auto_increment_id -> exclude(fromElement = "AUTO_INCREMENT", count = 3)
     // snippet : ROW_FORMAT = DYNAMIC
     SqlFeature.row_format -> exclude(fromElement = "ROW_FORMAT", count = 3)
     else -> this

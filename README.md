@@ -47,6 +47,13 @@ Feature | Version
 
 # Changes
 
+## 1.2.1
+
+- Possible to ignore the `AUTO_INCREMENT` table option with `--ignore auto_increment_id` when `db schema diff` .
+- Improve help messages and option completion of db commands.
+- Can be self-released via `release multi` .
+
+
 ## 1.2.0
 
 - Automatic resource cleanup when hitting `Ctrl + c`.
@@ -342,7 +349,7 @@ OPTIONS
 
 For comparing two schemas:
 ```
-vitool:> db schema diff dev.json test.json dev_vs_test.json
+vitool:> db schema diff --left dev.json --right test.json --to dev_vs_test.json
 Differences have been written to "/Users/viclau/project/github/vitool/dev_vs_test.json" .
 ```
 
@@ -353,7 +360,7 @@ NAME
        db schema diff - Compute differences of two table descriptions.
 
 SYNOPSIS
-       db schema diff [--left String] [--right String] --to String --pretty boolean --ignore String
+       db schema diff [--left String] [--right String] --to String --pretty boolean --ignore SqlFeature
 
 OPTIONS
        --left String
@@ -372,14 +379,14 @@ OPTIONS
        use pretty json or not
        [Optional, default = true]
 
-       --ignore String
-       ignore sql features, comma(',') separated. Possible values are: comment, index_storage_type, row_format
+       --ignore SqlFeature
+       ignore sql features. Possible values are: comment, index_storage_type, auto_increment_id, row_format
        [Optional]
 ```
 
 > Use `--ignore` option to tell the command to ignore some sql structures when computing the differences.
 > 
-> For example, pass `--ignore comment,row_format` if your don't care differences that exist in table comments, column comments and table row format.
+> For example, pass `--ignore comment --ignore row_format` if your don't care differences that exist in table comments, column comments and table row format.
 
 #### Schema Diff: the format of the produced differences
 

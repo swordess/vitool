@@ -59,6 +59,8 @@ open class AbstractShellComponent : AbstractShellComponent() {
     }
 
     // String -> Option
+    fun String?.toOption(): Option = Option().or { this }
+
     fun String?.orEnv(envVarName: String): Option = Option().or { this }.orEnv(envVarName)
 
     // Option -> String

@@ -21,17 +21,16 @@ private const val OSS_URL_BUCKET = "bucket"
 private const val OSS_URL_ENDPOINT = "endpoint"
 private const val OSS_URL_PATH = "path"
 
+// Format:
+//   oss://[<accessId>[:<accessSecret>]]@<protocol>://<bucket>.<endpoint>/<path>
+//
+// Example:
+//   oss://i1oVNSvejfYIBWO0aUakag8F:2vhMi9Ii5Gppbi1UClQdpcQfU1zWVc@https://foo.oss-cn-beijing.aliyuncs.com/bar/baz.json
+private const val OSS_URL_PATTERN =
+    """oss://((?<$OSS_URL_ACCESS_ID>\w+)(:(?<$OSS_URL_ACCESS_SECRET>\w+))?@)?(?<$OSS_URL_PROTOCOL>http|https)://(?<$OSS_URL_BUCKET>[a-zA-Z_0-9-]+).(?<$OSS_URL_ENDPOINT>[^/]+)/(?<$OSS_URL_PATH>.+)"""
+
 fun String.toOssFileProperties(): OssFileProperties {
-    // Format:
-    //   oss://[<accessId>[:<accessSecret>]]@<protocol>://<bucket>.<endpoint>/<path>
-    //
-    // Example:
-    //   oss://i1oVNSvejfYIBWO0aUakag8F:2vhMi9Ii5Gppbi1UClQdpcQfU1zWVc@https://foo.oss-cn-beijing.aliyuncs.com/bar/baz.json
-
-    val urlPattern =
-        """oss://((?<$OSS_URL_ACCESS_ID>\w+)(:(?<$OSS_URL_ACCESS_SECRET>\w+))?@)?(?<$OSS_URL_PROTOCOL>http|https)://(?<$OSS_URL_BUCKET>[a-zA-Z_0-9-]+).(?<$OSS_URL_ENDPOINT>[^/]+)/(?<$OSS_URL_PATH>.+)"""
-
-    val matchResult = urlPattern.toRegex().matchEntire(this)
+    val matchResult = OSS_URL_PATTERN.toRegex().matchEntire(this)
         ?: throw IllegalArgumentException("malformed url \"$this\", should be in format of `oss://[<accessId>[:<accessSecret>]]@<protocol>://<bucket>.<endpoint>/<path>`")
 
     val groups = matchResult.groups as MatchNamedGroupCollection

@@ -7,11 +7,11 @@
 
 package org.swordess.common.vitool.ext.shell
 
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class ConvertersTest {
@@ -53,7 +53,7 @@ class ConvertersTest {
             "oss://viclau-s.oss-cn-beijing.aliyuncs.com/bar/baz.json"]
     )
     fun testIllegal(url: String) {
-        assertThrows<IllegalArgumentException> { url.toOssFileProperties() }
+        assertFailsWith<IllegalArgumentException> { url.toOssFileProperties() }
     }
 
 }
