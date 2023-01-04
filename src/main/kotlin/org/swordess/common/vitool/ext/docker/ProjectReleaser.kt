@@ -14,6 +14,7 @@ import com.google.cloud.tools.jib.api.buildplan.Platform
 import com.google.cloud.tools.jib.event.events.ProgressEvent
 import com.google.cloud.tools.jib.event.events.TimerEvent
 import com.google.cloud.tools.jib.event.progress.ProgressEventHandler
+import kotlinx.coroutines.runBlocking
 import org.slf4j.Logger
 import org.swordess.common.vitool.ext.slf4j.CmdLogger
 import org.swordess.common.vitool.ported.jib.HelpfulSuggestions
@@ -26,9 +27,8 @@ import java.io.Closeable
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
+import kotlin.io.path.div
 
-
-data class ReleaseVersion(val specific: ImageVersion, val latest: ImageVersion)
 
 sealed class ProjectReleaser<T>(protected val config: T) {
     abstract fun run()
@@ -45,25 +45,24 @@ class DockerReleaser(config: Config) : ProjectReleaser<DockerReleaser.Config>(co
     )
 
     override fun run() {
-        with(DockerClient(config.registryUrl, config.registryUsername, config.registryPassword)) {
-            val image = getImage(config.buildVersion)
+        DockerClient(config.registryUrl, config.registryUsername, config.registryPassword).use { client ->
+            val image = client.getImage(config.buildVersion)
 
             if (image != null) {
                 val releaseVersion = config.releaseVersion
 
-                pushImage(releaseVersion.specific.also {
-                    if (it != config.buildVersion) {
-                        tagImage(image.id, it)
-                    }
-                })
+                runBlocking {
+                    client.pushImage(releaseVersion.specific.also {
+                        if (it != config.buildVersion) {
+                            client.tagImage(image.id, it)
+                        }
+                    })
 
-                pushImage(tagImage(image.id, releaseVersion.latest))
-
+                    client.pushImage(client.tagImage(image.id, releaseVersion.latest))
+                }
             } else {
                 CmdLogger.docker.info("Image not found: {}", config.buildVersion)
             }
-
-            close()
         }
     }
 
@@ -157,7 +156,7 @@ class JibReleaser(config: Config, private val project: Project) : ProjectRelease
 
         addJvmArgFilesLayer(jibContainerBuilder, classpathString)
 
-        return mutableListOf<String>().apply {
+        return buildList {
             add("java")
             // addAll(jvmFlags)
             add("-cp")
@@ -167,9 +166,8 @@ class JibReleaser(config: Config, private val project: Project) : ProjectRelease
     }
 
     private fun addJvmArgFilesLayer(jibContainerBuilder: JibContainerBuilder, classpath: String) {
-        val projectCache = project.jibCacheDirectory
-        val classpathFile: Path = projectCache.resolve(JIB_CLASSPATH_FILE)
-        val mainClassFile: Path = projectCache.resolve(JIB_MAIN_CLASS_FILE)
+        val classpathFile: Path = project.jibCacheDirectory / JIB_CLASSPATH_FILE
+        val mainClassFile: Path = project.jibCacheDirectory / JIB_MAIN_CLASS_FILE
 
         // It's perfectly fine to always generate a new temp file or rewrite an existing file. However,
         // fixing the source file path and preserving the file timestamp prevents polluting the Jib

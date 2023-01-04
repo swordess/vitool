@@ -7,9 +7,11 @@
 
 package org.swordess.common.vitool.ext.storage
 
+import com.aliyun.oss.OSS
 import com.aliyun.oss.OSSClientBuilder
 import com.aliyun.oss.model.GetObjectRequest
 import com.aliyun.oss.model.PutObjectRequest
+import java.io.Closeable
 import java.io.File
 
 interface ReadableData<V> {
@@ -51,13 +53,13 @@ class FileData(private val path: String) : ReadableData<String>, WriteableData<S
 // e.g.,
 //   https      :// foo      . oss-cn-beijing.aliyuncs.com / bar/baz.json
 data class OssFileProperties(
-    var protocol: String,
-    var bucket: String,
-    var endpoint: String,
-    var path: String,
+    val protocol: String,
+    val bucket: String,
+    val endpoint: String,
+    val path: String,
 
-    var accessId: String?,
-    var accessSecret: String?
+    val accessId: String?,
+    val accessSecret: String?
 )
 
 class OssData(private val config: OssFileProperties) : ReadableData<String>, WriteableData<String> {
@@ -66,26 +68,33 @@ class OssData(private val config: OssFileProperties) : ReadableData<String>, Wri
         get() = with(config) { "$protocol://$bucket.$endpoint/$path" }
 
     override fun read(callback: ((String) -> Unit)?): ByteArray {
-        val req = GetObjectRequest(config.bucket, config.path)
-
-        val client = OSSClientBuilder().build("${config.protocol}://${config.endpoint}", config.accessId, config.accessSecret)
-
-        val result = client.getObject(req).objectContent.use { it.readBytes() }
-        client.shutdown()
-
-        callback?.invoke(path)
-
-        return result
+        return Client().use { client ->
+            val req = GetObjectRequest(config.bucket, config.path)
+            val result = client.getObject(req).objectContent.use { it.readBytes() }
+            callback?.invoke(path)
+            result
+        }
     }
 
     override fun write(data: ByteArray, callback: ((String) -> Unit)?) {
-        val req = PutObjectRequest(config.bucket, config.path, data.inputStream())
+        Client().use {
+            val req = PutObjectRequest(config.bucket, config.path, data.inputStream())
+            it.putObject(req)
+            callback?.invoke(path)
+        }
+    }
 
-        val client = OSSClientBuilder().build("${config.protocol}://${config.endpoint}", config.accessId, config.accessSecret)
-        client.putObject(req)
-        client.shutdown()
+    private inner class Client(private val oss: OSS = ossClient()) : OSS by oss, Closeable {
+        override fun close() {
+            oss.shutdown()
+        }
+    }
 
-        callback?.invoke(path)
+    private fun ossClient(): OSS {
+        checkNotNull(config.accessId) { "accessId is missing" }
+        checkNotNull(config.accessSecret) { "accessSecret is missing" }
+        return OSSClientBuilder()
+            .build("${config.protocol}://${config.endpoint}", config.accessId, config.accessSecret)
     }
 
 }

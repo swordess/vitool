@@ -28,15 +28,15 @@ data class Artifact(
     val snapshot: Boolean = "SNAPSHOT" in versionId
 }
 
-class Project(private val buildDirectory: String, val mainClass: String) {
+class MalformedDependencyListFileException(path: String) : RuntimeException(path)
+
+class Project(buildDirectory: String, val mainClass: String) {
 
     private val classesDirectory: Path = Paths.get(buildDirectory, "classes")
 
-    val jibCacheDirectory: Path
-        get() = Paths.get(buildDirectory, CACHE_DIRECTORY_NAME)
+    val jibCacheDirectory: Path = Paths.get(buildDirectory, CACHE_DIRECTORY_NAME)
 
-    private val dependencyListFile: File
-        get() = File(buildDirectory, "vitool${File.separator}dependency-list.txt")
+    private val dependencyListFile = File(buildDirectory, "vitool${File.separator}dependency-list.txt")
 
     fun createJibContainerBuilder(javaContainerBuilder: JavaContainerBuilder): JibContainerBuilder {
         // Add resources, and classes
@@ -58,12 +58,13 @@ class Project(private val buildDirectory: String, val mainClass: String) {
         return javaContainerBuilder.toContainerBuilder()
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     private fun parseArtifacts(): Set<Artifact> {
         var lines = dependencyListFile.readLines().takeIf { it.size > 2 }
-            ?: throw RuntimeException("the file content of `dependency-list.txt` seems not okay :(")
+            ?: throw MalformedDependencyListFileException(dependencyListFile.absolutePath)
 
         // skip top 2 lines
-        lines = lines.slice(2 until lines.size)
+        lines = lines.slice(2..< lines.size)
 
         lines = lines.filter { it.isNotBlank() }.map { it.trim() }
 
@@ -91,9 +92,10 @@ class Project(private val buildDirectory: String, val mainClass: String) {
     }
 
     private fun classifyDependencies(dependencies: Set<Artifact>): Map<LayerType, List<Path>> {
-        val classifiedDependencies: MutableMap<LayerType, MutableList<Path>> = mutableMapOf()
-        classifiedDependencies[LayerType.DEPENDENCIES] = mutableListOf()
-        classifiedDependencies[LayerType.SNAPSHOT_DEPENDENCIES] = mutableListOf()
+        val classifiedDependencies = mapOf<LayerType, MutableList<Path>>(
+            LayerType.DEPENDENCIES to mutableListOf(),
+            LayerType.SNAPSHOT_DEPENDENCIES to mutableListOf()
+        )
         for (artifact in dependencies) {
             if (artifact.snapshot) {
                 classifiedDependencies[LayerType.SNAPSHOT_DEPENDENCIES]!!.add(File(artifact.path).toPath())

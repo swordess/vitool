@@ -62,11 +62,12 @@ object ProgressDisplayGenerator {
      * @param progress the overall progress, with `1.0` meaning fully complete
      * @return the progress bar line
      */
+    @OptIn(ExperimentalStdlibApi::class)
     private fun generateProgressBar(progress: Double): String {
         val progressBar = StringBuilder()
         progressBar.append('[')
         val barsToDisplay = (PROGRESS_BAR_COUNT * progress).roundToInt()
-        for (barIndex in 0 until PROGRESS_BAR_COUNT) {
+        for (barIndex in 0 ..< PROGRESS_BAR_COUNT) {
             progressBar.append(if (barIndex < barsToDisplay) '=' else ' ')
         }
         return progressBar

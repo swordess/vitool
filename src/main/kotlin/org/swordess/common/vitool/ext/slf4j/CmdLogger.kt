@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory
 import kotlin.reflect.KProperty
 
 object CmdLogger {
+    val db by LoggerDelegate()
     val docker by LoggerDelegate()
     val jib by LoggerDelegate()
 }

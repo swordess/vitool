@@ -30,11 +30,11 @@ class Quit : Quit.Command {
 
     companion object {
 
-        private val handlers: MutableList<() -> Unit> = mutableListOf()
+        private var handlers: List<() -> Unit> = listOf()
         private var exited = false
 
         fun onExit(handler: () -> Unit) {
-            handlers.add(handler)
+            handlers += handler
         }
 
         fun fireExit(): Boolean {

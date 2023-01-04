@@ -8,7 +8,7 @@
 package org.swordess.common.vitool.ext.shell
 
 import org.swordess.common.vitool.ext.storage.OssFileProperties
-import java.lang.IllegalArgumentException
+import java.net.MalformedURLException
 
 
 inline fun <reified T : Enum<T>> String.toEnums(delimiter: Char = ','): Set<T> =
@@ -31,7 +31,7 @@ private const val OSS_URL_PATTERN =
 
 fun String.toOssFileProperties(): OssFileProperties {
     val matchResult = OSS_URL_PATTERN.toRegex().matchEntire(this)
-        ?: throw IllegalArgumentException("malformed url \"$this\", should be in format of `oss://[<accessId>[:<accessSecret>]]@<protocol>://<bucket>.<endpoint>/<path>`")
+        ?: throw MalformedURLException("\"$this\", should be in format of `oss://[<accessId>[:<accessSecret>]]@<protocol>://<bucket>.<endpoint>/<path>`")
 
     val groups = matchResult.groups as MatchNamedGroupCollection
 

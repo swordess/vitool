@@ -28,8 +28,10 @@ class ReleaseCommands : AbstractShellComponent() {
     private val imageNameWithRepository = "${DockerRegistry.aliyun.url}/viclau/vitool"
 
     private fun releaseSingle(to: DockerRegistry, username: String, password: String?, useVPC: Boolean) {
-        if (System.getProperty("os.name") == "Mac OS X") {
-            throw RuntimeException("Multi-platform images need extra work, run this command on Linux.")
+        if (System.getProperty("os.name") == "Mac OS X" && System.getProperty("os.arch") == "aarch64") {
+            println("Your OS produces Linux/arm64 images by default, as Linux/amd64" +
+                    " is more widely used you'd better run this command on Linux.")
+            return
         }
 
         val passwordOption = password.toOption()

@@ -9,6 +9,7 @@ package org.swordess.common.vitool.cmd
 
 import com.aliyuncs.DefaultAcsClient
 import com.aliyuncs.auth.sts.AssumeRoleRequest
+import com.aliyuncs.auth.sts.AssumeRoleResponse
 import com.aliyuncs.exceptions.ClientException
 import com.aliyuncs.http.MethodType
 import com.aliyuncs.profile.DefaultProfile
@@ -25,7 +26,7 @@ class AliyunOssCommands {
             val profile: IClientProfile = DefaultProfile.getProfile(region, accessKeyId, accessKeySecret)
             val client = DefaultAcsClient(profile)
 
-            val response = client.getAcsResponse(AssumeRoleRequest().apply {
+            val response: AssumeRoleResponse = client.getAcsResponse(AssumeRoleRequest().apply {
                 sysMethod = MethodType.POST
                 roleArn = arn
                 roleSessionName = "vitool_verify_" + System.currentTimeMillis()

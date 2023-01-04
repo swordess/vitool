@@ -7,8 +7,14 @@
 
 package org.swordess.common.vitool.cmd
 
-import com.google.gson.GsonBuilder
-import com.google.gson.stream.JsonReader
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.jooq.DSLContext
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
@@ -30,13 +36,12 @@ import org.springframework.shell.table.TableModel
 import org.swordess.common.vitool.cmd.customize.Quit
 import org.swordess.common.vitool.ext.shell.AbstractShellComponent
 import org.swordess.common.vitool.ext.shell.toOssFileProperties
+import org.swordess.common.vitool.ext.slf4j.CmdLogger
 import org.swordess.common.vitool.ext.sql.*
 import org.swordess.common.vitool.ext.storage.*
-import java.lang.RuntimeException
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
-import java.util.*
 import kotlin.properties.Delegates
 
 private const val ENV_VI_DB_URL = "VI_DB_URL"
@@ -67,7 +72,7 @@ private data class DbConnection(
 @ShellComponent
 class DatabaseCommands : AbstractShellComponent() {
 
-    private val gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
+    private val json = Json { prettyPrint = true }
 
     private val namedConnections: MutableMap<String, DbConnection> = mutableMapOf()
 
@@ -91,13 +96,13 @@ class DatabaseCommands : AbstractShellComponent() {
 
     init {
         Quit.onExit {
-            try {
-                // `dbClose` modified the `namedConnections`, so make a copy to avoid ConcurrentModificationException
-                namedConnections.keys.toList().forEach {
+            // `dbClose` modified the `namedConnections`, so make a copy to avoid ConcurrentModificationException
+            namedConnections.keys.toList().forEach {
+                try {
                     dbClose(it)
+                } catch (e: SQLException) {
+                    CmdLogger.db.warn("failed to close db connection", e)
                 }
-            } catch (e: SQLException) {
-                e.printStackTrace()
             }
         }
     }
@@ -137,7 +142,7 @@ class DatabaseCommands : AbstractShellComponent() {
             .must("`password` cannot be inferred")
 
         val props = ConnectionProperties(urlOption, usernameOption, passwordOption)
-        val conn = DriverManager.getConnection(props.url, props.username, props.password)
+        val conn: Connection = DriverManager.getConnection(props.url, props.username, props.password)
         val create = DSL.using(conn)
 
         println("Connection[name='$name'] has been established.")
@@ -158,10 +163,10 @@ class DatabaseCommands : AbstractShellComponent() {
     ) {
         val connection = mustConnection(name ?: activeConnection!!.name)
         try {
-            with(connection) {
-                conn.close()
-                println("Connection[name='${this.name}'] has been closed.")
+            connection.conn.use {
+                // intended to safely close the db connection
             }
+            println("Connection[name='${connection.name}'] has been closed.")
         } finally {
             namedConnections.remove(connection.name)
             activeConnection = null
@@ -237,7 +242,7 @@ class DatabaseCommands : AbstractShellComponent() {
             if (QueryFormat.json == format) {
                 val output = StringBuilder()
                 for (i in result.indices) {
-                    output.append("[").append(i).append("] = ").append(gson.toJson(result[i])).append("\n")
+                    output.append("[").append(i).append("] = ").append(json.encodeToString(result[i])).append("\n")
                 }
                 output.append(result.size).append(" row(s) returned")
                 return output
@@ -257,8 +262,7 @@ class DatabaseCommands : AbstractShellComponent() {
                     // set header names
                     data[0] = result[0].keys.toTypedArray()
 
-                    for (i in result.indices) {
-                        val row = result[i]
+                    for ((i, row) in result.withIndex()) {
                         data[i + 1] = row.values.toTypedArray()
                     }
 
@@ -329,7 +333,7 @@ class DatabaseCommands : AbstractShellComponent() {
 
         with(connection.create) {
             if (configuration().dialect() != SQLDialect.MYSQL) {
-                throw RuntimeException("Only mysql is supported.")
+                throw UnsupportedOperationException("Only mysql is supported.")
             }
 
             val tableNames = resultQuery("show tables").use { it.fetchInto(String::class.java) }
@@ -339,24 +343,29 @@ class DatabaseCommands : AbstractShellComponent() {
                 val createTableSql: String? =
                     resultQuery("show create table $tableName").use { it.fetchOne(1, String::class.java) }
 
-                createTableSql?.let {
+                createTableSql?.also {
                     tableDescs.add(parseCreateTable(it))
-                }
+                } ?: CmdLogger.db.warn("cannot fetch DDL for table `$tableName`")
             }
         }
 
-        return SchemaDesc(tableDescs, Date())
+        return SchemaDesc(tableDescs, Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()))
     }
 
     private fun dbSchemaDiff(left: String, right: String, to: String, pretty: Boolean, ignores: Set<SqlFeature>) {
-        val leftDesc = left.toSourceDescriptionProvider {
-            println("Left side descriptions have been loaded from \"$it\" .")
-        }.invoke()
-        val rightDesc = right.toSourceDescriptionProvider {
-            println("Right side descriptions have been loaded from \"$it\" .")
-        }.invoke()
-
-        val schemaDiff = diff(leftDesc, rightDesc, ignores)
+        val schemaDiff = runBlocking {
+            val leftDesc = async {
+                left.toSourceDescriptionProvider {
+                    println("Left side descriptions have been loaded from \"$it\" .")
+                }.invoke()
+            }
+            val rightDesc = async {
+                right.toSourceDescriptionProvider {
+                    println("Right side descriptions have been loaded from \"$it\" .")
+                }.invoke()
+            }
+            diff(leftDesc.await(), rightDesc.await(), ignores)
+        }
 
         if (schemaDiff.tables.isEmpty() && schemaDiff.insideTables.isEmpty()) {
             println("(No differences.)")
@@ -419,15 +428,9 @@ class DatabaseCommands : AbstractShellComponent() {
             .build()
     }
 
-    private fun writeJson(data: Any, to: String, pretty: Boolean, callback: (Any?) -> Unit) {
-        val gson = GsonBuilder().apply {
-            disableHtmlEscaping()
-            if (pretty) {
-                setPrettyPrinting()
-            }
-        }.create()
-
-        to.toDestDescriptionStorage().write(gson.toJson(data).toByteArray(), callback)
+    private inline fun <reified T> writeJson(data: T, to: String, pretty: Boolean, noinline callback: (Any) -> Unit) {
+        val json = Json { prettyPrint = pretty }
+        to.toDestDescriptionStorage().write(json.encodeToString(data).toByteArray(), callback)
     }
 
     private fun String.toDestDescriptionStorage(): WriteableData<out Any> =
@@ -451,29 +454,33 @@ class DatabaseCommands : AbstractShellComponent() {
         } else if (startsWith(LOCATION_PREFIX_OSS)) {
             val data = toOssData()
             return {
-                gson.fromJson(JsonReader(data.read(callback).inputStream().reader()), SchemaDesc::class.java)
+                json.decodeFromString(String(data.read(callback)))
             }
 
         } else {
             val data = FileData(this)
             return {
-                gson.fromJson(JsonReader(data.read(callback).inputStream().reader()), SchemaDesc::class.java)
+                json.decodeFromString(String(data.read(callback)))
             }
         }
     }
 
     private fun String.toOssData(): OssData {
-        val props = toOssFileProperties()
+        var props = toOssFileProperties()
 
-        props.accessId = props.accessId
-            .orEnv(ENV_VI_OSS_ACCESS_ID)
-            .orInput("Enter OSS access id:", mask = false)
-            .must("OSS access id cannot be inferred")
+        props = props.copy(
+            accessId = props.accessId
+                .orEnv(ENV_VI_OSS_ACCESS_ID)
+                .orInput("Enter OSS access id:", mask = false)
+                .must("OSS access id cannot be inferred")
+        )
 
-        props.accessSecret = props.accessSecret
-            .orEnv(ENV_VI_OSS_ACCESS_SECRET)
-            .orInput("Enter OSS access secret:")
-            .must("OSS access secret cannot be inferred")
+        props = props.copy(
+            accessSecret = props.accessSecret
+                .orEnv(ENV_VI_OSS_ACCESS_SECRET)
+                .orInput("Enter OSS access secret:")
+                .must("OSS access secret cannot be inferred")
+        )
 
         return OssData(props)
     }

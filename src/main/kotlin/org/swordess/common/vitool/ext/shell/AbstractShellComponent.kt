@@ -12,14 +12,13 @@ import org.springframework.shell.component.StringInput.StringInputContext
 import org.springframework.shell.standard.AbstractShellComponent
 import java.io.IOError
 import java.io.InterruptedIOException
-import java.lang.RuntimeException
 
 open class AbstractShellComponent : AbstractShellComponent() {
 
-    inner class Option(private val providers: MutableList<() -> String?> = mutableListOf()) {
+    inner class Option(private var providers: List<() -> String?> = listOf()) {
 
         fun or(provider: () -> String?): Option {
-            providers.add(provider)
+            providers += provider
             return this
         }
 
@@ -34,11 +33,11 @@ open class AbstractShellComponent : AbstractShellComponent() {
             }
 
             try {
-                val context = component.run(StringInputContext.empty())
+                val context: StringInputContext = component.run(StringInputContext.empty())
                 context.resultValue
-            }catch (e: IOError) {
+            } catch (e: IOError) {
                 if (e.cause is InterruptedIOException) {
-                    throw RuntimeException("input has been cancelled")
+                    throw InterruptedException("input has been cancelled")
                 }
                 throw e
             }

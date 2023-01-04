@@ -8,6 +8,8 @@
 package org.swordess.common.vitool.ext.docker
 
 
+data class ReleaseVersion(val specific: ImageVersion, val latest: ImageVersion)
+
 sealed interface ReleaseVersionProvider {
     fun getRegistryUrl(useVPC: Boolean): String
     fun getReleaseVersion(buildVersion: ImageVersion, useVPC: Boolean): ReleaseVersion

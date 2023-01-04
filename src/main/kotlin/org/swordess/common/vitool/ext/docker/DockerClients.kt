@@ -16,10 +16,12 @@ import com.github.dockerjava.core.DockerClientConfig
 import com.github.dockerjava.core.DockerClientImpl
 import com.github.dockerjava.transport.DockerHttpClient
 import com.github.dockerjava.zerodep.ZerodepDockerHttpClient
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.springframework.util.unit.DataSize
+import org.swordess.common.vitool.ext.slf4j.CmdLogger
 import java.io.Closeable
-import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 
 data class ImageVersion(val name: String, val tag: String) {
@@ -49,73 +51,75 @@ fun DockerClient.getImage(version: ImageVersion): Image? =
 
 fun DockerClient.tagImage(id: String, version: ImageVersion): ImageVersion {
     tagImageCmd(id, version.name, version.tag).exec()
-    println("Image tag created: $version")
+    CmdLogger.docker.info("Image tag created: $version")
     return version
 }
 
-fun DockerClient.pushImage(version: ImageVersion) {
-    var started = false
-    var finished = false
-
-    pushImageCmd(version.toString()).exec(object : ResultCallback.Adapter<PushResponseItem>() {
+suspend fun DockerClient.pushImage(version: ImageVersion): Unit = suspendCancellableCoroutine { continuation ->
+    var processingStream: Closeable? = null
+    val callback = object : ResultCallback.Adapter<PushResponseItem>() {
 
         override fun onStart(stream: Closeable) {
             super.onStart(stream)
-            started = true
+            processingStream = stream
         }
 
         override fun onNext(item: PushResponseItem) {
+            var msg: String? = null
+
             if (item.id != null) {
                 if (item.progressDetail != null) {
-                    val current = item.progressDetail?.current?.let { DataSize.ofBytes(it) }
-                    val total = item.progressDetail?.total?.let { DataSize.ofBytes(it) }
+                    val current = item.progressDetail!!.current?.let { DataSize.ofBytes(it) }
+                    val total = item.progressDetail!!.total?.let { DataSize.ofBytes(it) }
 
                     if (current != null && total != null) {
                         val progress = if (current.toBytes() < total.toMegabytes()) {
                             "${current.toHumanizeString()}/${total.toHumanizeString()}"
                         } else current.toHumanizeString()
-                        println("${item.status} ${item.id} $progress")
+                        msg = "${item.status} ${item.id} $progress"
                     } else {
-                        println("${item.status} ${item.id}")
+                        msg = "${item.status} ${item.id}"
                     }
 
                 } else {
-                    println("${item.status} ${item.id}")
+                    msg = "${item.status} ${item.id}"
                 }
 
             } else if (item.errorDetail != null) {
-                println(item.errorDetail?.message)
+                msg = item.errorDetail!!.message
 
             } else if (item.aux != null) {
                 // the response right before this one matches the last branch of this if-else
 
             } else {
-                println(item.status)
+                msg = item.status
             }
+
+            msg?.let { CmdLogger.docker.info(it) }
+        }
+
+        override fun onError(throwable: Throwable) {
+            super.onError(throwable)
+            continuation.resumeWithException(throwable)
         }
 
         override fun onComplete() {
             super.onComplete()
-            finished = true
+            continuation.resume(Unit)
         }
 
-    })
+    }
 
-    thread {
+    pushImageCmd(version.toString()).exec(callback)
+    continuation.invokeOnCancellation {
         try {
-            while (!started) {
-                TimeUnit.SECONDS.sleep(1)
-                if (!started) {
-                    println("Waiting for start ...")
-                }
+            processingStream?.use {
+                // intended to safely close the stream
             }
-            while (!finished) {
-                TimeUnit.SECONDS.sleep(1)
-            }
-        } catch (e: InterruptedException) {
-            println("Image push has been interrupted")
+        } finally {
+            CmdLogger.docker.info("Image push has been interrupted")
         }
-    }.join()
+    }
 }
 
 private fun DataSize.toHumanizeString(): String {

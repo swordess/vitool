@@ -7,14 +7,21 @@
 
 package org.swordess.common.vitool.ext.sql
 
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.Serializable
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
 import net.sf.jsqlparser.statement.create.table.CreateTable
-import java.util.Date
 
-data class SchemaDesc(val tables: List<TableDesc>, val timestamp: Date)
+
+@Serializable
+data class SchemaDesc(val tables: List<TableDesc>, val timestamp: LocalDateTime)
 
 typealias Options = List<String>
 
+@Serializable
 data class TableDesc(
     val name: String,
     val columns: List<ColumnDesc>,
@@ -28,6 +35,7 @@ private interface NamedSqlSnippet {
     val rawSql: String
 }
 
+@Serializable
 data class ColumnDesc(
     override val name: String,
     val type: String,
@@ -35,6 +43,7 @@ data class ColumnDesc(
     override val rawSql: String
 ) : NamedSqlSnippet
 
+@Serializable
 data class IndexDesc(
     override val name: String,
     val type: String,
@@ -49,12 +58,20 @@ private const val MYSQL_INDEX_TYPE_PK = "PRIMARY KEY"
  */
 private const val MYSQL_INDEX_NAME_PK = "__PK__"
 
-data class SchemaDiff(val tables: List<TableMissingDiff>, val insideTables: List<TableDetailDiff>, val timestamp: Date)
+@Serializable
+data class SchemaDiff(val tables: List<TableMissingDiff>, val insideTables: List<TableDetailDiff>, val timestamp: LocalDateTime)
 
-data class TableMissingDiff(val left: TableDdl?, val right: TableDdl?)
+@Serializable
+data class TableMissingDiff(val left: TableDdl?, val right: TableDdl?) {
+    init {
+        require(left != null || right != null) { "either `left` or `right` should not be null" }
+    }
+}
 
+@Serializable
 data class TableDdl(val name: String, val sql: String)
 
+@Serializable
 data class TableDetailDiff(
     val name: String,
     val columns: List<StringDiff>,
@@ -62,7 +79,12 @@ data class TableDetailDiff(
     val option: StringDiff?
 )
 
-data class StringDiff(val left: String?, val right: String?)
+@Serializable
+data class StringDiff(val left: String?, val right: String?) {
+    init {
+        require(left != null || right != null) { "at least one of `left` and `right` should be present" }
+    }
+}
 
 enum class SqlFeature {
     comment,
@@ -90,7 +112,7 @@ fun parseCreateTable(sql: String): TableDesc = with(CCJSqlParserUtil.parse(sql) 
         )
     } ?: emptyList()
 
-    val options = tableOptionsStrings
+    val options: Options = tableOptionsStrings
 
     TableDesc(table.name, columns, indexes, options, sql)
 }
@@ -146,7 +168,7 @@ fun diff(left: SchemaDesc, right: SchemaDesc, ignores: Set<SqlFeature>): SchemaD
         }
     }
 
-    return SchemaDiff(missingTables, tableDetailDiffs, Date())
+    return SchemaDiff(missingTables, tableDetailDiffs, Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()))
 }
 
 private fun ColumnDesc.ignore(feature: SqlFeature): ColumnDesc = when(feature) {
@@ -191,9 +213,10 @@ private fun Options.ignore(features: Set<SqlFeature>): Options {
     return result
 }
 
+@OptIn(ExperimentalStdlibApi::class)
 private fun List<String>.exclude(fromElement: String, count: Int): List<String> {
     val indexOfEl = indexOf(fromElement)
-    return if (indexOfEl != -1) filterIndexed { index, _ -> index !in (indexOfEl until indexOfEl + count) } else this
+    return if (indexOfEl != -1) filterIndexed { index, _ -> index !in (indexOfEl ..< indexOfEl + count) } else this
 }
 
 private data class NamedSqlSnippetPair(
