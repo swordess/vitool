@@ -22,7 +22,7 @@
 
         <aliyun-oss.version>3.15.2</aliyun-oss.version>
 
-        <docker-java.version>3.2.14</docker-java.version>
+        <docker-java.version>3.3.0</docker-java.version>
 
         <jib.version>0.23.0</jib.version>
         <google-http-client.version>1.42.2</google-http-client.version>
